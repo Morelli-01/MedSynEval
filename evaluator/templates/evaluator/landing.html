@@ -1,0 +1,53 @@
+{% extends 'evaluator/base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="row justify-content-center mt-3 mt-md-5 px-2 px-md-0">
+    <div class="col-12 col-md-10 col-lg-8">
+        <!-- Sponsor Banner -->
+        <div class="text-center mb-4">
+            <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);">
+                <div class="card-body py-3 py-md-4">
+                    <div class="d-flex align-items-center justify-content-center flex-wrap">
+                        <span class="text-muted me-2 me-md-3 fw-bold small">Sponsored by</span>
+                        <a href="https://aimagelab.ing.unimore.it/imagelab/" target="_blank" rel="noopener" class="text-decoration-none">
+                            <img src="{% static 'evaluator/aimagelab_logo.png' %}" alt="AImageLab - Artificial Intelligence and Image Analysis Laboratory" style="height: 60px; max-height: 80px;" class="img-fluid">
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="jumbotron bg-light p-4 p-md-5 rounded shadow-lg text-center">
+            <h1 class="display-5 display-md-4 text-primary fw-bold">Welcome to MedSynEval</h1>
+            <p class="lead mt-3">A platform for evaluating synthetic medical imagery.</p>
+            <hr class="my-4">
+            
+            {% if user.is_authenticated %}
+                <p class="mb-4">You are logged in as <strong>{{ user.username }}</strong>.</p>
+                <div class="d-grid gap-2 col-12 col-sm-8 col-md-6 mx-auto">
+                    <a class="btn btn-primary btn-lg shadow" href="{% url 'evaluate' %}" role="button">
+                        <i class="bi bi-clipboard-check"></i> Start Evaluation
+                    </a>
+                </div>
+            {% else %}
+                <div class="alert alert-warning mx-auto" role="alert" style="max-width: 600px;">
+                    <h5 class="alert-heading"><i class="bi bi-exclamation-triangle-fill"></i> Access Restricted</h5>
+                    <p class="mb-0 small">This application is for authorized clinicians only. If you do not have an invitation, please do not attempt to register.</p>
+                </div>
+                <div class="mt-4">
+                    <div class="d-grid gap-3 col-12 col-sm-10 col-md-8 col-lg-6 mx-auto">
+                        <a class="btn btn-primary btn-lg shadow-sm" href="{% url 'login' %}" role="button">
+                            <i class="bi bi-box-arrow-in-right"></i> Login
+                        </a>
+                        <a class="btn btn-outline-secondary btn-lg shadow-sm" href="{% url 'register' %}" role="button">
+                            <i class="bi bi-person-plus"></i> Register with Token
+                        </a>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

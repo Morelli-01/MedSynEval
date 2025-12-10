@@ -1,0 +1,174 @@
+{% extends 'evaluator/base.html' %}
+
+{% block content %}
+<div class="row justify-content-center mt-4">
+    <div class="col-md-7">
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">Create Your Account</h4>
+            </div>
+            <div class="card-body p-4">
+                {% if error %}
+                    <div class="alert alert-danger">{{ error }}</div>
+                {% endif %}
+                
+                <form method="post" id="registrationForm">
+                    {% csrf_token %}
+                    
+                    <!-- Token Input Section -->
+                    <div class="mb-4">
+                        <label for="id_token" class="form-label fw-bold">Invitation Token <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <input type="text" 
+                                   name="token" 
+                                   class="form-control" 
+                                   id="id_token" 
+                                   value="{{ token }}"
+                                   {% if token %}readonly{% endif %}
+                                   placeholder="Enter your invitation token"
+                                   required>
+                            <button class="btn btn-outline-secondary" type="button" id="checkTokenBtn" {% if token %}disabled{% endif %}>
+                                <i class="bi bi-search"></i> Verify
+                            </button>
+                        </div>
+                        <div id="tokenFeedback" class="form-text"></div>
+                        <div id="tokenValidation" class="mt-2"></div>
+                    </div>
+
+                    <!-- Registration Fields (hidden until token is valid) -->
+                    <div id="registrationFields" style="display: {% if token %}block{% else %}none{% endif %};">
+                        {{ form.as_p }}
+                        <div class="d-grid gap-2 mt-4">
+                            <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">
+                                <i class="bi bi-person-plus"></i> Create Account
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const tokenInput = document.getElementById('id_token');
+    const checkBtn = document.getElementById('checkTokenBtn');
+    const tokenFeedback = document.getElementById('tokenFeedback');
+    const tokenValidation = document.getElementById('tokenValidation');
+    const registrationFields = document.getElementById('registrationFields');
+    const submitBtn = document.getElementById('submitBtn');
+    
+    let isTokenValid = {% if token %}true{% else %}false{% endif %};
+    
+    // Real-time validation on input
+    let validationTimeout;
+    tokenInput.addEventListener('input', function() {
+        clearTimeout(validationTimeout);
+        if (tokenInput.value.trim().length > 0) {
+            validationTimeout = setTimeout(() => validateToken(), 500);
+        } else {
+            resetValidation();
+        }
+    });
+    
+    // Manual check button
+    checkBtn.addEventListener('click', validateToken);
+    
+    // Enter key triggers validation
+    tokenInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            validateToken();
+        }
+    });
+    
+    async function validateToken() {
+        const token = tokenInput.value.trim();
+        
+        if (!token) {
+            showFeedback('Please enter a token', 'warning');
+            return;
+        }
+        
+        // Show loading state
+        checkBtn.disabled = true;
+        checkBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Checking...';
+        tokenValidation.innerHTML = '<div class="text-muted"><i class="bi bi-hourglass-split"></i> Validating token...</div>';
+        
+        try {
+            const response = await fetch('{% url "validate_token" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({ token: token })
+            });
+            
+            const data = await response.json();
+            
+            if (data.valid) {
+                isTokenValid = true;
+                showFeedback(data.message, 'success');
+                tokenValidation.innerHTML = `
+                    <div class="alert alert-success d-flex align-items-center">
+                        <i class="bi bi-check-circle-fill me-2"></i>
+                        <div>Token verified! You can now complete your registration.</div>
+                    </div>
+                `;
+                registrationFields.style.display = 'block';
+                tokenInput.classList.add('is-valid');
+                tokenInput.classList.remove('is-invalid');
+                checkBtn.innerHTML = '<i class="bi bi-check-circle"></i> Verified';
+            } else {
+                isTokenValid = false;
+                showFeedback(data.message, 'danger');
+                tokenValidation.innerHTML = `
+                    <div class="alert alert-danger d-flex align-items-center">
+                        <i class="bi bi-x-circle-fill me-2"></i>
+                        <div>${data.message}</div>
+                    </div>
+                `;
+                registrationFields.style.display = 'none';
+                tokenInput.classList.add('is-invalid');
+                tokenInput.classList.remove('is-valid');
+                checkBtn.innerHTML = '<i class="bi bi-search"></i> Verify';
+                checkBtn.disabled = false;
+            }
+        } catch (error) {
+            showFeedback('Error validating token. Please try again.', 'danger');
+            tokenValidation.innerHTML = `
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle"></i> Network error. Please check your connection.
+                </div>
+            `;
+            checkBtn.innerHTML = '<i class="bi bi-search"></i> Verify';
+            checkBtn.disabled = false;
+        }
+    }
+    
+    function showFeedback(message, type) {
+        tokenFeedback.className = `form-text text-${type}`;
+        tokenFeedback.textContent = message;
+    }
+    
+    function resetValidation() {
+        tokenValidation.innerHTML = '';
+        tokenFeedback.textContent = 'Enter the invitation token provided by your administrator';
+        tokenFeedback.className = 'form-text';
+        registrationFields.style.display = 'none';
+        tokenInput.classList.remove('is-valid', 'is-invalid');
+        isTokenValid = false;
+    }
+    
+    // Prevent form submission if token is invalid
+    document.getElementById('registrationForm').addEventListener('submit', function(e) {
+        if (!isTokenValid) {
+            e.preventDefault();
+            showFeedback('Please verify your invitation token first', 'danger');
+        }
+    });
+});
+</script>
+{% endblock %}

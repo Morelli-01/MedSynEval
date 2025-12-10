@@ -1,0 +1,94 @@
+
+#footer {
+    background-color: #ffffff;
+    border-top: 1px solid #e9ecef;
+    padding: 1rem 0;
+}
+
+.footer-position {
+    position: relative;
+    z-index: 1030;
+}
+
+@media (min-width: 768px) {
+    .footer-position {
+        position: fixed;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        z-index: 1030;
+    }
+}
+
+.b-example-divider {
+    height: 3rem;
+    background-color: rgba(0, 0, 0, .1);
+    border: solid rgba(0, 0, 0, .15);
+    border-top-width: medium;
+    border-right-width: medium;
+    border-bottom-width: medium;
+    border-left-width: medium;
+    border-width: 1px 0;
+    box-shadow: inset 0 .5em 1.5em rgba(0, 0, 0, .1), inset 0 .125em .5em rgba(0, 0, 0, .15);
+}
+
+.alert {
+    z-index: 1031;
+}
+
+.copy-button {
+    position : absolute;
+    bottom   : 15px;
+    right: 15px;
+}
+
+/* overflow paper bib */
+
+.fixed-len-card {
+    height: 400px;
+}
+
+@media only screen and (max-width: 600px) {
+    .fixed-len-card {
+        height: auto;
+    }
+}
+
+.custom-button {
+    width: 200px !important;
+    height: 200px !important;
+    margin-right: 20px !important;
+}
+
+.custom-button:hover{
+    background-image: linear-gradient(rgba(0, 0, 0, 0.0), rgba(0, 0, 0, 0.4));
+}
+
+#cite_box {
+    overflow-y: auto;
+    max-height: 320px;
+}
+
+/* Smooth form inputs */
+.form-control, .form-select {
+    border-radius: 0.5rem;
+    border: 1px solid #dee2e6;
+    transition: all 0.3s ease;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.15);
+}
+
+/* Remove password requirement text */
+.helptext {
+    display: none !important;
+}
+
+ul.errorlist {
+    list-style: none;
+    padding: 0;
+    margin: 0.5rem 0;
+    color: #dc3545;
+}

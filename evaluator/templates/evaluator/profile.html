@@ -1,0 +1,186 @@
+{% extends 'evaluator/base.html' %}
+
+{% block content %}
+<div class="container mt-3 mt-md-5 px-2 px-md-3">
+    <div class="row justify-content-center">
+        <div class="col-12 col-md-10 col-lg-8 col-xl-6">
+            <div class="card shadow-lg border-0">
+                <div class="card-header text-white py-4" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                    <div class="d-flex align-items-center flex-column flex-sm-row text-center text-sm-start">
+                        <!-- Modern Avatar -->
+                        <div class="avatar-circle mb-3 mb-sm-0 me-sm-3">
+                            <div class="avatar-gradient">
+                                <span class="avatar-initials">{{ user.first_name.0|default:'U' }}{{ user.last_name.0|default:'U' }}</span>
+                            </div>
+                        </div>
+                        <div>
+                            <h4 class="mb-1">My Profile</h4>
+                            <small class="opacity-75">
+                                <i class="bi bi-at"></i> {{ user.username }}
+                            </small>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body p-3 p-md-4">
+                    <form method="post" id="profileForm">
+                        {% csrf_token %}
+                        
+                        <!-- Personal Information Section -->
+                        <div class="mb-4">
+                            <h6 class="text-muted text-uppercase fw-bold mb-3">
+                                <i class="bi bi-person-badge"></i> Personal Information
+                            </h6>
+                            
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label for="{{ form.first_name.id_for_label }}" class="form-label fw-bold">
+                                        First Name
+                                    </label>
+                                    <input type="text" 
+                                           name="{{ form.first_name.name }}" 
+                                           class="form-control form-control-lg" 
+                                           id="{{ form.first_name.id_for_label }}"
+                                           value="{{ form.first_name.value|default:'' }}"
+                                           placeholder="First name">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="{{ form.last_name.id_for_label }}" class="form-label fw-bold">
+                                        Last Name
+                                    </label>
+                                    <input type="text" 
+                                           name="{{ form.last_name.name }}" 
+                                           class="form-control form-control-lg" 
+                                           id="{{ form.last_name.id_for_label }}"
+                                           value="{{ form.last_name.value|default:'' }}"
+                                           placeholder="Last name">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Contact Information Section -->
+                        <div class="mb-4">
+                            <h6 class="text-muted text-uppercase fw-bold mb-3">
+                                <i class="bi bi-envelope"></i> Contact Information
+                            </h6>
+                            
+                            <div class="mb-3">
+                                <label for="{{ form.email.id_for_label }}" class="form-label fw-bold">
+                                    Email Address
+                                </label>
+                                <div class="input-group input-group-lg">
+                                    <span class="input-group-text"><i class="bi bi-envelope"></i></span>
+                                    <input type="email" 
+                                           name="{{ form.email.name }}" 
+                                           class="form-control" 
+                                           id="{{ form.email.id_for_label }}"
+                                           value="{{ form.email.value|default:'' }}"
+                                           placeholder="your.email@example.com">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Professional Information Section -->
+                        <div class="mb-4">
+                            <h6 class="text-muted text-uppercase fw-bold mb-3">
+                                <i class="bi bi-briefcase"></i> Professional Information
+                            </h6>
+                            
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label for="{{ form.title.id_for_label }}" class="form-label fw-bold">
+                                        Title
+                                    </label>
+                                    <input type="text" 
+                                           name="{{ form.title.name }}" 
+                                           class="form-control form-control-lg" 
+                                           id="{{ form.title.id_for_label }}"
+                                           value="{{ form.title.value|default:'' }}"
+                                           placeholder="e.g., Dr., Prof.">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="{{ form.years_experience.id_for_label }}" class="form-label fw-bold">
+                                        Years of Experience
+                                    </label>
+                                    <input type="number" 
+                                           name="{{ form.years_experience.name }}" 
+                                           class="form-control form-control-lg" 
+                                           id="{{ form.years_experience.id_for_label }}"
+                                           value="{{ form.years_experience.value|default:'0' }}"
+                                           min="0"
+                                           placeholder="0">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="d-grid gap-2 mt-4">
+                            <button type="submit" class="btn btn-primary btn-lg shadow">
+                                <i class="bi bi-save"></i> Save Changes
+                            </button>
+                            <a href="{% url 'evaluate' %}" class="btn btn-outline-secondary">
+                                <i class="bi bi-x-circle"></i> Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+                <div class="card-footer bg-light text-center py-3">
+                    <small class="text-muted">
+                        <i class="bi bi-info-circle"></i> Your information is kept private and secure
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Modern Avatar Styles */
+.avatar-circle {
+    width: 80px;
+    height: 80px;
+}
+
+.avatar-gradient {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    border: 3px solid rgba(255, 255, 255, 0.3);
+}
+
+.avatar-initials {
+    font-size: 2rem;
+    font-weight: bold;
+    color: white;
+    text-transform: uppercase;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* Form Styles */
+.form-control-lg {
+    border-radius: 0.5rem;
+}
+
+.input-group-text {
+    background-color: #f8f9fa;
+    border-right: none;
+}
+
+.input-group .form-control {
+    border-left: none;
+}
+
+.input-group .form-control:focus {
+    border-left: none;
+}
+
+.input-group:focus-within .input-group-text {
+    border-color: #0d6efd;
+    background-color: #e7f3ff;
+}
+</style>
+{% endblock %}
