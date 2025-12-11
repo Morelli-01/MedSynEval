@@ -17,13 +17,20 @@
                     
                     <!-- Token Input Section -->
                     <div class="mb-4">
-                        <label for="id_token" class="form-label fw-bold">Invitation Token <span class="text-danger">*</span></label>
+                        <label for="id_token" class="form-label fw-bold">
+                            Invitation Token <span class="text-danger">*</span>
+                            <i class="bi bi-info-circle text-muted" 
+                               data-bs-toggle="tooltip" 
+                               data-bs-placement="right" 
+                               title="Enter the invitation token provided by your administrator"
+                               style="cursor: help;"></i>
+                        </label>
                         <div class="input-group">
                             <input type="text" 
                                    name="token" 
                                    class="form-control" 
                                    id="id_token" 
-                                   value="{{ token }}"
+                                   value="{% if token %}{{ token }}{% endif %}"
                                    {% if token %}readonly{% endif %}
                                    placeholder="Enter your invitation token"
                                    required>
@@ -52,6 +59,12 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Initialize Bootstrap tooltips
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+    
     const tokenInput = document.getElementById('id_token');
     const checkBtn = document.getElementById('checkTokenBtn');
     const tokenFeedback = document.getElementById('tokenFeedback');

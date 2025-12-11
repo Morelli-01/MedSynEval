@@ -3,6 +3,7 @@ import random
 import uuid as uuid_lib
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth import login
 from django.conf import settings
 from django.contrib import messages
 from django.core.exceptions import ValidationError
@@ -40,15 +41,19 @@ def register(request):
 
         form = ClinicianRegistrationForm(request.POST)
         if form.is_valid():
-            form.save()
+            user = form.save()
             invitation.is_used = True
             invitation.save()
-            messages.success(request, 'Account created successfully. Please log in.')
-            return redirect('login')
+            
+            # Automatically log in the user
+            login(request, user)
+            messages.success(request, 'Account created successfully. Welcome!')
+            return redirect('evaluate')
     else:
         form = ClinicianRegistrationForm()
     
     return render(request, 'evaluator/register.html', {'form': form, 'token': token_str})
+
 
 @login_required
 def evaluate_image(request):
