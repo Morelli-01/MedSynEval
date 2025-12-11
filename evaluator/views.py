@@ -29,12 +29,12 @@ def register(request):
         
         # Validate UUID format
         try:
-            uuid_lib.UUID(token_str)
+            uuid_lib.UUID(token_str.strip())
         except (ValueError, AttributeError):
             return render(request, 'evaluator/register.html', {'form': ClinicianRegistrationForm(request.POST), 'error': 'Invalid token format.', 'token': token_str})
              
         try:
-            invitation = Invitation.objects.get(token=token_str, is_used=False)
+            invitation = Invitation.objects.get(token=token_str.strip(), is_used=False)
         except Invitation.DoesNotExist:
              return render(request, 'evaluator/register.html', {'form': ClinicianRegistrationForm(request.POST), 'error': 'Invalid or used invitation token.', 'token': token_str})
 

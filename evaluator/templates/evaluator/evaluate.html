@@ -3,7 +3,24 @@
 {% block content %}
 <div class="container-fluid px-2 px-lg-4 mt-4">
     <div class="row justify-content-center">
-        <div class="col-12 col-xl-11">
+        <div class="col-12 col-xl-11 position-relative">
+            <div class="alert alert-warning shadow-sm border-0 info-banner d-none d-xl-flex align-items-start">
+                <i class="bi bi-exclamation-triangle-fill me-2 text-warning fs-4"></i>
+                <div>
+                    <h6 class="fw-bold mb-1">Important</h6>
+                    <p class="mb-0 small">Images contain random markers, so amke sure to ignore them when making your judgment.</p>
+                </div>
+            </div>
+            <div class="alert alert-warning shadow-sm border-0 d-xl-none mb-3">
+                <div class="d-flex align-items-start">
+                    <i class="bi bi-exclamation-triangle-fill me-2 text-warning fs-4"></i>
+                    <div>
+                        <h6 class="fw-bold mb-1">Important</h6>
+                        <p class="mb-0 small">Images contain random markers, so make sure to ignore them when making your judgment.</p>
+                    </div>
+                </div>
+            </div>
+
             <!-- Completion Message (hidden by default) -->
             <div id="completionMessage" class="card shadow-lg border-0 d-none">
                 <div class="card-body text-center py-5">
@@ -34,7 +51,7 @@
                                  style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); max-width: none; transition: none; user-select: none;">
                         </div>
                         <div class="position-absolute bottom-0 start-0 w-100 p-2 text-center text-white-50 bg-black bg-opacity-25 pointer-events-none">
-                            <small><i class="bi bi-arrows-move"></i> Drag • <i class="bi bi-arrow-down-up"></i> Zoom • <i class="bi bi-arrows-collapse"></i> Dbl-Click Reset</small>
+                            <small><i class="bi bi-arrows-move"></i> Drag • <i class="bi bi-arrow-down-up"></i> Zoom • <i class="bi bi-arrows-collapse"></i> Double-Click Reset</small>
                         </div>
                     </div>
 
@@ -193,6 +210,23 @@
 /* Base Styles adjustments */
 .card {
     border-radius: 0.75rem;
+}
+
+.info-banner {
+    position: absolute;
+    left: -260px;
+    top: 0;
+    width: 240px;
+    z-index: 2;
+}
+
+@media (max-width: 1199px) {
+    .info-banner {
+        position: static;
+        width: auto;
+        left: 0;
+        top: 0;
+    }
 }
 
 /* Mobile responsive adjustments */
