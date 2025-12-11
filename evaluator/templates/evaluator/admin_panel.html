@@ -1,0 +1,302 @@
+{% extends 'evaluator/base.html' %}
+{% load admin_filters %}
+
+{% block title %}Admin Panel - Clinician Analytics{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-2 px-lg-4 mt-4">
+    <div class="row justify-content-center">
+        <div class="col-12 col-xxl-11">
+            <!-- Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2 class="fw-bold text-primary mb-1">
+                        <i class="bi bi-graph-up-arrow me-2"></i>Clinician Analytics Dashboard
+                    </h2>
+                    <p class="text-muted mb-0">Evaluation accuracy and performance metrics</p>
+                </div>
+                <div class="text-end">
+                    <div class="badge bg-primary fs-6 px-3 py-2">
+                        <i class="bi bi-people-fill me-1"></i>
+                        {{ clinicians|length }} Clinician{{ clinicians|length|pluralize }}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Overall Statistics -->
+            <div class="row g-3 mb-4">
+                <div class="col-md-3">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body text-center">
+                            <div class="text-primary mb-2">
+                                <i class="bi bi-clipboard-check fs-1"></i>
+                            </div>
+                            <h3 class="fw-bold mb-0">{{ total_evaluations }}</h3>
+                            <p class="text-muted small mb-0">Total Evaluations</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body text-center">
+                            <div class="text-success mb-2">
+                                <i class="bi bi-check-circle fs-1"></i>
+                            </div>
+                            <h3 class="fw-bold mb-0">{{ overall_accuracy|floatformat:1 }}%</h3>
+                            <p class="text-muted small mb-0">Overall Accuracy</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body text-center">
+                            <div class="text-info mb-2">
+                                <i class="bi bi-camera fs-1"></i>
+                            </div>
+                            <h3 class="fw-bold mb-0">{{ total_real_images }}</h3>
+                            <p class="text-muted small mb-0">Real Images</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body text-center">
+                            <div class="text-warning mb-2">
+                                <i class="bi bi-cpu fs-1"></i>
+                            </div>
+                            <h3 class="fw-bold mb-0">{{ total_synth_images }}</h3>
+                            <p class="text-muted small mb-0">Synthetic Images</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Clinicians Table -->
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white py-3 border-bottom">
+                    <h5 class="mb-0 fw-bold">
+                        <i class="bi bi-table me-2"></i>Clinician Performance
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0 align-middle">
+                            <thead class="bg-light">
+                                <tr>
+                                    <th class="px-4 py-3 fw-bold text-uppercase small">Clinician</th>
+                                    <th class="px-4 py-3 fw-bold text-uppercase small text-center">Total Evaluations</th>
+                                    <th class="px-4 py-3 fw-bold text-uppercase small text-center">Correct</th>
+                                    <th class="px-4 py-3 fw-bold text-uppercase small text-center">Incorrect</th>
+                                    <th class="px-4 py-3 fw-bold text-uppercase small text-center">Accuracy</th>
+                                    <th class="px-4 py-3 fw-bold text-uppercase small text-center">Avg Confidence</th>
+                                    <th class="px-4 py-3 fw-bold text-uppercase small text-center">Experience</th>
+                                    <th class="px-4 py-3 fw-bold text-uppercase small text-center">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for clinician in clinicians %}
+                                <tr>
+                                    <td class="px-4 py-3">
+                                        <div class="d-flex align-items-center">
+                                            <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3" 
+                                                 style="width: 40px; height: 40px; font-weight: bold;">
+                                                {{ clinician.username|slice:":1"|upper }}
+                                            </div>
+                                            <div>
+                                                <div class="fw-bold">{{ clinician.username }}</div>
+                                                {% if clinician.title %}
+                                                <small class="text-muted">{{ clinician.title }}</small>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="px-4 py-3 text-center">
+                                        <span class="badge bg-light text-dark border fs-6">{{ clinician.total_evaluations }}</span>
+                                    </td>
+                                    <td class="px-4 py-3 text-center">
+                                        <span class="badge bg-success fs-6">{{ clinician.correct_evaluations }}</span>
+                                    </td>
+                                    <td class="px-4 py-3 text-center">
+                                        <span class="badge bg-danger fs-6">{{ clinician.incorrect_evaluations }}</span>
+                                    </td>
+                                    <td class="px-4 py-3 text-center">
+                                        <div class="d-flex align-items-center justify-content-center">
+                                            <div class="progress" style="width: 100px; height: 8px;">
+                                                <div class="progress-bar 
+                                                    {% if clinician.accuracy >= 80 %}bg-success
+                                                    {% elif clinician.accuracy >= 60 %}bg-warning
+                                                    {% else %}bg-danger{% endif %}" 
+                                                    role="progressbar" 
+                                                    style="width: {{ clinician.accuracy }}%"
+                                                    aria-valuenow="{{ clinician.accuracy }}" 
+                                                    aria-valuemin="0" 
+                                                    aria-valuemax="100">
+                                                </div>
+                                            </div>
+                                            <span class="ms-2 fw-bold">{{ clinician.accuracy|floatformat:1 }}%</span>
+                                        </div>
+                                    </td>
+                                    <td class="px-4 py-3 text-center">
+                                        <div class="d-flex align-items-center justify-content-center">
+                                            {% for i in "12345" %}
+                                                {% if forloop.counter <= clinician.avg_confidence|floatformat:0|add:"0" %}
+                                                    <i class="bi bi-star-fill text-warning"></i>
+                                                {% else %}
+                                                    <i class="bi bi-star text-muted"></i>
+                                                {% endif %}
+                                            {% endfor %}
+                                            <span class="ms-2 small text-muted">({{ clinician.avg_confidence|floatformat:1 }})</span>
+                                        </div>
+                                    </td>
+                                    <td class="px-4 py-3 text-center">
+                                        <span class="badge bg-info text-dark">{{ clinician.years_experience }} year{{ clinician.years_experience|pluralize }}</span>
+                                    </td>
+                                    <td class="px-4 py-3 text-center">
+                                        <button class="btn btn-sm btn-outline-primary" 
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#detailsModal{{ clinician.id }}">
+                                            <i class="bi bi-eye"></i> Details
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="8" class="text-center py-5 text-muted">
+                                        <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                                        No clinicians have completed evaluations yet.
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modals are now outside the table structure -->
+{% for clinician in clinicians %}
+<div class="modal fade" id="detailsModal{{ clinician.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-white border-bottom">
+                <div class="d-flex align-items-center">
+                    <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3" 
+                         style="width: 48px; height: 48px; font-size: 1.2rem; font-weight: bold;">
+                        {{ clinician.username|slice:":1"|upper }}
+                    </div>
+                    <div>
+                        <h5 class="modal-title fw-bold">{{ clinician.username }}</h5>
+                        <div class="text-muted small">
+                            {{ clinician.title|default:"Clinician" }} • {{ clinician.years_experience }} Year{{ clinician.years_experience|pluralize }} Experience
+                        </div>
+                    </div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4 bg-light">
+                <div class="row g-4">
+                    <!-- Left Column: Performance Stats -->
+                    <div class="col-md-5">
+                        <div class="bg-white p-4 rounded-3 shadow-sm h-100">
+                            <h6 class="fw-bold text-uppercase text-muted small mb-4">Performance Breakdown</h6>
+                            
+                            <div class="mb-4">
+                                <div class="d-flex justify-content-between align-items-end mb-1">
+                                    <span class="text-muted">Real Images</span>
+                                    <span class="fw-bold fs-5">{{ clinician.real_accuracy|floatformat:1 }}%</span>
+                                </div>
+                                <div class="progress" style="height: 6px;">
+                                    <div class="progress-bar bg-success" role="progressbar" style="width: {{ clinician.real_accuracy }}%"></div>
+                                </div>
+                                <div class="small text-muted mt-1">
+                                    {{ clinician.real_correct }} correct / {{ clinician.real_evaluated }} total
+                                </div>
+                            </div>
+
+                            <div class="mb-0">
+                                <div class="d-flex justify-content-between align-items-end mb-1">
+                                    <span class="text-muted">Synthetic Images</span>
+                                    <span class="fw-bold fs-5">{{ clinician.synth_accuracy|floatformat:1 }}%</span>
+                                </div>
+                                <div class="progress" style="height: 6px;">
+                                    <div class="progress-bar bg-warning" role="progressbar" style="width: {{ clinician.synth_accuracy }}%"></div>
+                                </div>
+                                <div class="small text-muted mt-1">
+                                    {{ clinician.synth_correct }} correct / {{ clinician.synth_evaluated }} total
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right Column: Confidence Chart -->
+                    <div class="col-md-7">
+                        <div class="bg-white p-4 rounded-3 shadow-sm h-100">
+                            <h6 class="fw-bold text-uppercase text-muted small mb-4">Confidence Distribution</h6>
+                            <div class="confidence-chart">
+                                {% for conf in "12345" %}
+                                <div class="mb-3">
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <div class="d-flex align-items-center">
+                                            <span class="badge bg-light text-dark border me-2">{{ forloop.counter }}</span>
+                                            <span class="small text-muted">Confidence</span>
+                                        </div>
+                                        <span class="fw-bold small">{{ clinician.confidence_dist|get_item:forloop.counter|floatformat:0 }}%</span>
+                                    </div>
+                                    <div class="progress" style="height: 10px; background-color: #f1f3f5;">
+                                        <div class="progress-bar bg-primary opacity-75" 
+                                             role="progressbar" 
+                                             style="width: {{ clinician.confidence_dist|get_item:forloop.counter }}%">
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-4 pt-3 border-top text-center text-muted small">
+                    <i class="bi bi-clock me-1"></i> User joined {{ clinician.date_joined|date:"F j, Y" }} • 
+                    Email: {{ clinician.email|default:"Not provided" }}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+<style>
+.progress {
+    background-color: #e9ecef;
+}
+
+.table > :not(caption) > * > * {
+    padding: 1rem 0.75rem;
+}
+
+.badge {
+    font-weight: 500;
+}
+
+.card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+}
+
+.confidence-chart .progress-bar {
+    transition: width 0.3s ease;
+}
+
+.modal-body {
+    max-height: 70vh;
+    overflow-y: auto;
+}
+</style>
+{% endblock %}

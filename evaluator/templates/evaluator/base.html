@@ -31,6 +31,13 @@
                 <li class="nav-item">
                     <a class="nav-link" aria-current="page" href="{% url 'evaluate' %}">Evaluate</a>
                 </li>
+                {% if user.is_superuser %}
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'admin_panel' %}">
+                        <i class="bi bi-speedometer2"></i> Admin Panel
+                    </a>
+                </li>
+                {% endif %}
             </ul>
             <ul class="navbar-nav align-items-center">
                 <!-- AImageLab Logo in Navbar -->
