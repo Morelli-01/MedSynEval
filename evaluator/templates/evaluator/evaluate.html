@@ -4,131 +4,123 @@
 <div class="container-fluid px-2 px-lg-4 mt-4">
     <div class="row justify-content-center">
         <div class="col-12 col-xl-11">
-            <!-- Header -->
-            <div class="text-center mb-3 mb-md-4">
-                <h2 class="fw-bold text-primary fs-3 fs-md-2">
-                    <i class="bi bi-clipboard-check"></i> Image Evaluation
-                </h2>
-                <p class="text-muted mb-2 small">Evaluate whether the medical image below is real or synthetically generated</p>
-                <div id="progressInfo" class="badge bg-secondary fs-6">Loading...</div>
-            </div>
-
             <!-- Completion Message (hidden by default) -->
-            <div id="completionMessage" class="alert alert-success text-center d-none mx-2 mx-md-0">
-                <h4 class="fs-5 fs-md-4"><i class="bi bi-check-circle-fill"></i> All Done!</h4>
-                <p class="mb-3 small">You have evaluated all available images. Thank you for your contribution!</p>
-                <a href="{% url 'home' %}" class="btn btn-primary">Return to Home</a>
+            <div id="completionMessage" class="card shadow-lg border-0 d-none">
+                <div class="card-body text-center py-5">
+                    <h4 class="fs-3 text-success mb-3"><i class="bi bi-check-circle-fill"></i> All Done!</h4>
+                    <p class="lead mb-4">You have evaluated all available images. Thank you for your contribution!</p>
+                    <a href="{% url 'home' %}" class="btn btn-primary btn-lg">Return to Home</a>
+                </div>
             </div>
 
-            <div id="evaluationContainer" class="row">
-                <!-- Image Display Column -->
-                <div class="col-12 col-lg-8 mb-4">
-                    <div class="card shadow-lg border-0">
-                        <div class="card-header bg-gradient text-white text-center py-3" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-                            <h5 class="mb-0"><i class="bi bi-image"></i> Medical Image</h5>
+            <!-- Main Evaluation Card -->
+            <div id="evaluationContainer" class="card shadow-lg border-0 overflow-hidden" style="max-height: 85vh;">
+                <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 fw-bold text-primary">
+                        <i class="bi bi-clipboard-check me-2"></i>Image Evaluation
+                    </h5>
+                    <div id="progressInfo" class="badge bg-light text-dark border fs-6">Loading...</div>
+                </div>
+                
+                <div class="row g-0 h-100">
+                    <!-- Image Display Column -->
+                    <div class="col-lg-8 bg-dark position-relative d-flex flex-column justify-content-center" style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);">
+                        <div class="image-viewer w-100" id="imageViewer">
+                            <img src="{{ image_url }}" 
+                                 id="medicalImage"
+                                 class="img-fluid" 
+                                 alt="Medical Image" 
+                                 draggable="false"
+                                 style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); max-width: none; transition: none; user-select: none;">
                         </div>
-                        <div class="card-body p-0 position-relative" style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);">
-                            <div class="image-viewer" id="imageViewer">
-                                <img src="{{ image_url }}" 
-                                     id="medicalImage"
-                                     class="img-fluid" 
-                                     alt="Medical Image" 
-                                     draggable="false"
-                                     style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); max-width: none; transition: none; user-select: none;">
-                            </div>
-                        </div>
-                        <div class="card-footer bg-light text-center">
-                            <small class="text-muted">
-                                <i class="bi bi-info-circle"></i> <strong>Drag</strong> to pan • <strong>Scroll</strong> to zoom • <strong>Double-click</strong> to reset
-                            </small>
+                        <div class="position-absolute bottom-0 start-0 w-100 p-2 text-center text-white-50 bg-black bg-opacity-25 pointer-events-none">
+                            <small><i class="bi bi-arrows-move"></i> Drag • <i class="bi bi-arrow-down-up"></i> Zoom • <i class="bi bi-arrows-collapse"></i> Dbl-Click Reset</small>
                         </div>
                     </div>
-                </div>
 
-                <!-- Evaluation Form Column -->
-                <div class="col-12 col-lg-4">
-                    <div class="card shadow-lg border-0 evaluation-form-card">
-                        <div class="card-header bg-primary text-white py-3">
-                            <h5 class="mb-0"><i class="bi bi-pencil-square"></i> Your Evaluation</h5>
-                        </div>
-                        <div class="card-body p-4">
-                            <form id="evaluationForm">
-                                {% csrf_token %}
-                                <input type="hidden" id="imagePath" value="{{ image_path }}">
-                                
-                                <!-- Image Type Selection -->
+                    <!-- Evaluation Form Column -->
+                    <div class="col-lg-4 bg-white border-start">
+                        <div class="h-100 d-flex flex-column">
+                            <div class="p-4 flex-grow-1 overflow-auto custom-scrollbar">
                                 <div class="mb-4">
-                                    <label class="form-label fw-bold mb-3">
-                                        <i class="bi bi-question-circle"></i> Image Classification
-                                    </label>
-                                    <div class="btn-group w-100" role="group">
-                                        <input type="radio" class="btn-check" name="is_real" id="is_real_true" value="true" required>
-                                        <label class="btn btn-outline-primary btn-lg" for="is_real_true">
-                                            <i class="bi bi-camera"></i> Real
-                                        </label>
-                                        <input type="radio" class="btn-check" name="is_real" id="is_real_false" value="false" required>
-                                        <label class="btn btn-outline-primary btn-lg" for="is_real_false">
-                                            <i class="bi bi-cpu"></i> Synthetic
-                                        </label>
-                                    </div>
-                                </div>
+                                    <h6 class="text-uppercase text-muted fw-bold mb-3" style="font-size: 0.75rem; letter-spacing: 1px;">Assessment</h6>
+                                    <form id="evaluationForm">
+                                        {% csrf_token %}
+                                        <input type="hidden" id="imagePath" value="{{ image_path }}">
+                                        
+                                        <!-- Image Type Selection -->
+                                        <div class="mb-4">
+                                            <label class="form-label fw-bold mb-2 small text-dark">
+                                                Classification
+                                            </label>
+                                            <div class="btn-group w-100" role="group">
+                                                <input type="radio" class="btn-check" name="is_real" id="is_real_true" value="true" required>
+                                                <label class="btn btn-outline-primary py-2" for="is_real_true">
+                                                    <i class="bi bi-camera me-1"></i> Real
+                                                </label>
+                                                <input type="radio" class="btn-check" name="is_real" id="is_real_false" value="false" required>
+                                                <label class="btn btn-outline-primary py-2" for="is_real_false">
+                                                    <i class="bi bi-cpu me-1"></i> Synthetic
+                                                </label>
+                                            </div>
+                                        </div>
 
-                                <!-- Confidence Rating -->
-                                <div class="mb-4">
-                                    <label class="form-label fw-bold mb-3">
-                                        <i class="bi bi-speedometer"></i> Confidence Level
-                                    </label>
-                                    <div class="confidence-selector">
-                                        <div class="form-check mb-2">
-                                            <input class="form-check-input" type="radio" name="confidence" id="confidence_1" value="1" required>
-                                            <label class="form-check-label d-flex align-items-center w-100" for="confidence_1">
-                                                <span class="confidence-badge me-3 badge bg-danger">1</span>
-                                                <span class="confidence-text flex-grow-1">Very Low Confidence</span>
+                                        <!-- Confidence Rating -->
+                                        <div class="mb-4">
+                                            <label class="form-label fw-bold mb-2 small text-dark">
+                                                Confidence Level
                                             </label>
+                                            <div class="confidence-selector d-flex flex-column gap-2">
+                                                <div class="form-check p-0 m-0">
+                                                    <input class="btn-check" type="radio" name="confidence" id="confidence_1" value="1" required>
+                                                    <label class="btn btn-outline-light text-dark w-100 text-start border d-flex align-items-center p-2 hover-bg-light" for="confidence_1">
+                                                        <span class="badge bg-danger rounded-pill me-2">1</span>
+                                                        <span class="small">Very Low</span>
+                                                    </label>
+                                                </div>
+                                                <div class="form-check p-0 m-0">
+                                                    <input class="btn-check" type="radio" name="confidence" id="confidence_2" value="2" required>
+                                                    <label class="btn btn-outline-light text-dark w-100 text-start border d-flex align-items-center p-2 hover-bg-light" for="confidence_2">
+                                                        <span class="badge bg-warning text-dark rounded-pill me-2">2</span>
+                                                        <span class="small">Low</span>
+                                                    </label>
+                                                </div>
+                                                <div class="form-check p-0 m-0">
+                                                    <input class="btn-check" type="radio" name="confidence" id="confidence_3" value="3" required>
+                                                    <label class="btn btn-outline-light text-dark w-100 text-start border d-flex align-items-center p-2 hover-bg-light" for="confidence_3">
+                                                        <span class="badge bg-info text-dark rounded-pill me-2">3</span>
+                                                        <span class="small">Moderate</span>
+                                                    </label>
+                                                </div>
+                                                <div class="form-check p-0 m-0">
+                                                    <input class="btn-check" type="radio" name="confidence" id="confidence_4" value="4" required>
+                                                    <label class="btn btn-outline-light text-dark w-100 text-start border d-flex align-items-center p-2 hover-bg-light" for="confidence_4">
+                                                        <span class="badge bg-success rounded-pill me-2">4</span>
+                                                        <span class="small">High</span>
+                                                    </label>
+                                                </div>
+                                                <div class="form-check p-0 m-0">
+                                                    <input class="btn-check" type="radio" name="confidence" id="confidence_5" value="5" required>
+                                                    <label class="btn btn-outline-light text-dark w-100 text-start border d-flex align-items-center p-2 hover-bg-light" for="confidence_5">
+                                                        <span class="badge bg-primary rounded-pill me-2">5</span>
+                                                        <span class="small">Very High</span>
+                                                    </label>
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div class="form-check mb-2">
-                                            <input class="form-check-input" type="radio" name="confidence" id="confidence_2" value="2" required>
-                                            <label class="form-check-label d-flex align-items-center w-100" for="confidence_2">
-                                                <span class="confidence-badge me-3 badge bg-warning">2</span>
-                                                <span class="confidence-text flex-grow-1">Low Confidence</span>
-                                            </label>
-                                        </div>
-                                        <div class="form-check mb-2">
-                                            <input class="form-check-input" type="radio" name="confidence" id="confidence_3" value="3" required>
-                                            <label class="form-check-label d-flex align-items-center w-100" for="confidence_3">
-                                                <span class="confidence-badge me-3 badge bg-info">3</span>
-                                                <span class="confidence-text flex-grow-1">Moderate Confidence</span>
-                                            </label>
-                                        </div>
-                                        <div class="form-check mb-2">
-                                            <input class="form-check-input" type="radio" name="confidence" id="confidence_4" value="4" required>
-                                            <label class="form-check-label d-flex align-items-center w-100" for="confidence_4">
-                                                <span class="confidence-badge me-3 badge bg-success">4</span>
-                                                <span class="confidence-text flex-grow-1">High Confidence</span>
-                                            </label>
-                                        </div>
-                                        <div class="form-check mb-2">
-                                            <input class="form-check-input" type="radio" name="confidence" id="confidence_5" value="5" required>
-                                            <label class="form-check-label d-flex align-items-center w-100" for="confidence_5">
-                                                <span class="confidence-badge me-3 badge bg-primary">5</span>
-                                                <span class="confidence-text flex-grow-1">Very High Confidence</span>
-                                            </label>
-                                        </div>
-                                    </div>
-                                </div>
 
-                                <!-- Submit Button -->
-                                <div class="d-grid gap-2 mt-4">
-                                    <button type="submit" class="btn btn-success btn-lg shadow" id="submitBtn">
-                                        <i class="bi bi-check-circle"></i> Submit Evaluation
-                                    </button>
+                                        <!-- Submit -->
+                                        <button type="submit" class="btn btn-success w-100 py-2 fw-bold shadow-sm" id="submitBtn">
+                                            Submit Evaluation
+                                        </button>
+                                    </form>
                                 </div>
-                            </form>
-                        </div>
-                        <div class="card-footer bg-light text-center">
-                            <small class="text-muted">
-                                <i class="bi bi-shield-check"></i> Your evaluation will be saved securely
-                            </small>
+                            </div>
+                            <div class="p-3 bg-light border-top text-center">
+                                <small class="text-muted" style="font-size: 0.70rem;">
+                                    <i class="bi bi-shield-lock"></i> Secure Evaluation
+                                </small>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -138,100 +130,35 @@
 </div>
 
 <style>
-.confidence-selector .form-check {
-    padding: 0.75rem;
-    border-radius: 0.5rem;
-    transition: all 0.2s;
-    border: 2px solid transparent;
+/* New Card Layout Styles */
+.hover-bg-light:hover {
+    background-color: #f8f9fa !important;
+    border-color: #dee2e6 !important;
 }
 
-.confidence-selector .form-check:hover {
-    background-color: #f8f9fa;
-    border-color: #dee2e6;
-}
-
-.confidence-selector .form-check-input:checked ~ .form-check-label {
-    font-weight: 600;
-}
-
-.confidence-selector .form-check:has(.form-check-input:checked) {
+.btn-check:checked + .btn-outline-light {
     background-color: #e7f3ff;
-    border-color: #0d6efd;
+    border-color: #0d6efd !important;
+    color: #0d6efd !important;
 }
 
-.confidence-badge {
-    font-size: 1rem;
-    padding: 0.35rem 0.65rem;
-    min-width: 2.5rem;
-    text-align: center;
-}
-
-.btn-check:checked + .btn-outline-primary {
-    background-color: #0d6efd;
-    border-color: #0d6efd;
-}
-
-.card {
-    border-radius: 0.75rem;
-}
-
-.bg-gradient {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+.btn-check:checked + .btn-outline-light .badge {
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.1);
 }
 
 .image-viewer {
-    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    background: transparent;
     width: 100%;
-    height: 700px;
+    height: 65vh; 
+    min-height: 400px;
+    max-height: 800px;
     overflow: hidden;
     position: relative;
     cursor: grab;
-}
-
-/* Mobile responsive */
-@media (max-width: 991px) {
-    .image-viewer {
-        height: 500px;
-    }
-    
-    .evaluation-form-card {
-        position: relative !important;
-        top: 0 !important;
-    }
-}
-
-@media (max-width: 576px) {
-    .image-viewer {
-        height: 400px;
-    }
-}
-
-/* Desktop sticky form */
-@media (min-width: 992px) {
-    .evaluation-form-card {
-        position: sticky;
-        top: 80px;
-        /* Match total height of image card: 
-           header (py-3) + image (700px) + footer 
-           Total: approximately 778px */
-        min-height: 800px;
-        display: flex;
-        flex-direction: column;
-    }
-    
-    .evaluation-form-card .card-body {
-        flex: 1;
-        overflow-y: auto;
-        display: flex;
-        flex-direction: column;
-    }
-    
-    .evaluation-form-card .card-body form {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-    }
+    /* Center fallback */
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
 
 .image-viewer:active {
@@ -240,6 +167,54 @@
 
 .image-viewer img {
     cursor: inherit;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent; 
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #d1d5db; 
+    border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af; 
+}
+
+.pointer-events-none {
+    pointer-events: none;
+}
+
+/* Base Styles adjustments */
+.card {
+    border-radius: 0.75rem;
+}
+
+/* Mobile responsive adjustments */
+@media (max-width: 991px) {
+    .image-viewer {
+        height: 50vh;
+        min-height: 300px;
+    }
+    
+    #evaluationContainer .row {
+        height: auto !important;
+    }
+    
+    #evaluationContainer {
+        height: auto !important;
+        max-height: none !important;
+    }
+
+    .col-lg-4.border-start {
+        border-left: 0 !important;
+        border-top: 1px solid #dee2e6 !important;
+    }
 }
 </style>
 
