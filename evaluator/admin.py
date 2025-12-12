@@ -328,7 +328,7 @@ class ImageSetAdmin(admin.ModelAdmin):
 
         # Render selection form
         context = {
-            'clinicians': Clinician.objects.filter(is_active=True, is_superuser=False),
+            'clinicians': Clinician.objects.filter(is_active=True),
             'imageset': queryset.first() if queryset.count() == 1 else None,
             'queryset': queryset,
             'action_checkbox_name': admin.helpers.ACTION_CHECKBOX_NAME,

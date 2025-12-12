@@ -79,7 +79,7 @@ class Assignment(models.Model):
     
     def get_progress(self):
         """Returns the evaluation progress as a percentage"""
-        if self.assigned_images.exists():
+        if self.pk and self.assigned_images.exists():
             total_images = self.assigned_images.count()
             evaluated_count = Evaluation.objects.filter(
                 clinician=self.clinician,
@@ -98,7 +98,7 @@ class Assignment(models.Model):
     
     def get_evaluated_count(self):
         """Returns the number of images evaluated"""
-        if self.assigned_images.exists():
+        if self.pk and self.assigned_images.exists():
             return Evaluation.objects.filter(
                 clinician=self.clinician,
                 image__in=self.assigned_images.all()
