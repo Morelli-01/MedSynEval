@@ -93,8 +93,11 @@ def evaluate_image(request):
         # Default to the first assignment
         selected_assignment = assignments.first()
 
-    # Get all images from the selected assignment's image set
-    assigned_image_ids = list(selected_assignment.image_set.images.values_list('id', flat=True))
+    # Get all images from the selected assignment
+    if selected_assignment.assigned_images.exists():
+        assigned_image_ids = list(selected_assignment.assigned_images.values_list('id', flat=True))
+    else:
+        assigned_image_ids = list(selected_assignment.image_set.images.values_list('id', flat=True))
     
     # Get already evaluated image IDs
     evaluated_image_ids = Evaluation.objects.filter(

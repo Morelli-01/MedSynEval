@@ -18,11 +18,24 @@ class ClinicianAdmin(UserAdmin):
 
 @admin.register(Evaluation)
 class EvaluationAdmin(admin.ModelAdmin):
-    list_display = ('clinician', 'image_path', 'is_real', 'confidence', 'timestamp')
+    list_display = ('clinician', 'get_image_display', 'is_real', 'confidence', 'timestamp', 'is_correct_display')
     list_filter = ('is_real', 'confidence', 'timestamp')
-    search_fields = ('clinician__username', 'image_path')
+    search_fields = ('clinician__username', 'image__original_filename')
     readonly_fields = ('timestamp',)
     actions = ['export_as_json']
+
+    def get_image_display(self, obj):
+        if obj.image:
+            return obj.image.original_filename
+        return obj.image_path
+    get_image_display.short_description = "Image"
+
+    def is_correct_display(self, obj):
+        if obj.image:
+            return obj.is_real == obj.image.is_real
+        return "-"
+    is_correct_display.short_description = "Correct?"
+    is_correct_display.boolean = True
     
     def export_as_json(self, request, queryset):
         """Export selected evaluations as JSON file"""
@@ -39,8 +52,12 @@ class EvaluationAdmin(admin.ModelAdmin):
                     'title': evaluation.clinician.title,
                     'years_experience': evaluation.clinician.years_experience,
                 },
-                'image_path': evaluation.image_path,
-                'is_real': evaluation.is_real,
+                'image_set': evaluation.image.image_set.name,
+                'image_path': evaluation.image.file.name,
+                'original_filename': evaluation.image.original_filename,
+                'ground_truth': evaluation.image.is_real,
+                'user_prediction': evaluation.is_real,
+                'is_correct': evaluation.is_real == evaluation.image.is_real,
                 'confidence': evaluation.confidence,
                 'timestamp': evaluation.timestamp.isoformat(),
             })
@@ -87,6 +104,7 @@ class ImageSetAdmin(admin.ModelAdmin):
     search_fields = ('name', 'description')
     readonly_fields = ('created_at', 'created_by', 'image_count', 'real_count', 'synth_count')
     inlines = [ImageInline]
+    actions = ['assign_split_action']
     change_list_template = 'admin/imageset_changelist.html'
     
     fieldsets = (
@@ -257,6 +275,68 @@ class ImageSetAdmin(admin.ModelAdmin):
         
         return render(request, 'admin/load_imageset_form.html')
 
+    def assign_split_action(self, request, queryset):
+        from django.shortcuts import render
+        from django.contrib import admin
+        import random
+        
+        if 'post' in request.POST:
+            clinician_ids = request.POST.getlist('clinicians')
+            if not clinician_ids:
+                self.message_user(request, "No clinicians selected.", level='error')
+                return None
+            
+            clinicians = list(Clinician.objects.filter(id__in=clinician_ids))
+            num_clinicians = len(clinicians)
+            
+            if num_clinicians == 0:
+                 self.message_user(request, "Selected clinicians not found.", level='error')
+                 return None
+
+            success_count = 0
+            for imageset in queryset:
+                images = list(imageset.images.all())
+                if not images:
+                    continue
+                    
+                random.shuffle(images)
+                
+                # Standard even split algorithm
+                k, m = divmod(len(images), num_clinicians)
+                chunks = [images[i*k + min(i, m):(i+1)*k + min(i+1, m)] for i in range(num_clinicians)]
+                
+                # Assign to each clinician
+                for i, clinician in enumerate(clinicians):
+                    if i < len(chunks):
+                        images_subset = chunks[i]
+                        # Create or get assignment
+                        assignment, created = Assignment.objects.get_or_create(
+                            clinician=clinician,
+                            image_set=imageset,
+                            defaults={'assigned_by': request.user}
+                        )
+                        # Set the specific subset of images
+                        assignment.assigned_images.set(images_subset)
+                        # Reset completion status if re-assigning? 
+                        # For safety, let's untick completed if we are giving new images.
+                        assignment.is_completed = False
+                        assignment.save()
+                success_count += 1
+            
+            self.message_user(request, f"Successfully split and assigned {success_count} ImageSets to {num_clinicians} clinicians.")
+            return None
+
+        # Render selection form
+        context = {
+            'clinicians': Clinician.objects.filter(is_active=True, is_superuser=False),
+            'imageset': queryset.first() if queryset.count() == 1 else None,
+            'queryset': queryset,
+            'action_checkbox_name': admin.helpers.ACTION_CHECKBOX_NAME,
+        }
+        return render(request, 'admin/assign_split_form.html', context)
+    
+    assign_split_action.short_description = "Assign to multiple users (Split)"
+
 
 @admin.register(Image)
 class ImageAdmin(admin.ModelAdmin):
@@ -331,7 +411,8 @@ class AssignmentAdmin(admin.ModelAdmin):
     def total_images(self, obj):
         return obj.image_set.images.count()
     total_images.short_description = "Total Images"
-    
+    save_on_top = True
+
     def save_model(self, request, obj, form, change):
         if not change:  # Only set assigned_by on creation
             obj.assigned_by = request.user

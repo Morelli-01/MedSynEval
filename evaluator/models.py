@@ -68,6 +68,7 @@ class Assignment(models.Model):
     assigned_by = models.ForeignKey(Clinician, on_delete=models.SET_NULL, null=True, related_name='assignments_created')
     is_completed = models.BooleanField(default=False)
     completed_at = models.DateTimeField(null=True, blank=True)
+    assigned_images = models.ManyToManyField(Image, blank=True, related_name='assignments_subset', help_text="Specific subset of images assigned to this clinician. If empty, implies all images.")
     
     class Meta:
         ordering = ['-assigned_at']
@@ -78,17 +79,30 @@ class Assignment(models.Model):
     
     def get_progress(self):
         """Returns the evaluation progress as a percentage"""
-        total_images = self.image_set.images.count()
+        if self.assigned_images.exists():
+            total_images = self.assigned_images.count()
+            evaluated_count = Evaluation.objects.filter(
+                clinician=self.clinician,
+                image__in=self.assigned_images.all()
+            ).count()
+        else:
+            total_images = self.image_set.images.count()
+            evaluated_count = Evaluation.objects.filter(
+                clinician=self.clinician,
+                image__image_set=self.image_set
+            ).count()
+            
         if total_images == 0:
             return 0
-        evaluated_count = Evaluation.objects.filter(
-            clinician=self.clinician,
-            image__image_set=self.image_set
-        ).count()
         return (evaluated_count / total_images) * 100
     
     def get_evaluated_count(self):
         """Returns the number of images evaluated"""
+        if self.assigned_images.exists():
+            return Evaluation.objects.filter(
+                clinician=self.clinician,
+                image__in=self.assigned_images.all()
+            ).count()
         return Evaluation.objects.filter(
             clinician=self.clinician,
             image__image_set=self.image_set

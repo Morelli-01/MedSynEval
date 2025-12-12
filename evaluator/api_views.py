@@ -62,9 +62,14 @@ def submit_evaluation(request):
         
         assigned_image_ids = []
         for assignment in assignments:
-            assigned_image_ids.extend(
-                assignment.image_set.images.values_list('id', flat=True)
-            )
+            if assignment.assigned_images.exists():
+                assigned_image_ids.extend(
+                    assignment.assigned_images.values_list('id', flat=True)
+                )
+            else:
+                assigned_image_ids.extend(
+                    assignment.image_set.images.values_list('id', flat=True)
+                )
         
         if image.id not in assigned_image_ids:
             return JsonResponse({'success': False, 'message': 'Unauthorized access to this image'}, status=403)
@@ -126,9 +131,14 @@ def get_next_image(request):
         # Get all images from assigned image sets
         assigned_image_ids = []
         for assignment in assignments:
-            assigned_image_ids.extend(
-                assignment.image_set.images.values_list('id', flat=True)
-            )
+            if assignment.assigned_images.exists():
+                assigned_image_ids.extend(
+                    assignment.assigned_images.values_list('id', flat=True)
+                )
+            else:
+                assigned_image_ids.extend(
+                    assignment.image_set.images.values_list('id', flat=True)
+                )
         
         # Get already evaluated image IDs
         evaluated_image_ids = Evaluation.objects.filter(
