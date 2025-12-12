@@ -1,12 +1,18 @@
 {% extends 'evaluator/base.html' %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-8 text-center">
-        <div class="alert alert-success" role="alert">
-            <h4 class="alert-heading">All Done!</h4>
-            <p>You have evaluated all available images. Thank you for your contribution.</p>
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow-lg border-0">
+                <div class="card-body text-center py-5">
+                    <h4 class="fs-3 text-success mb-3"><i class="bi bi-check-circle-fill"></i> All Done!</h4>
+                    <p class="lead mb-4">{{ message|default:"You have evaluated all available images. Thank you for your contribution!" }}</p>
+                    <a href="{% url 'home' %}" class="btn btn-primary btn-lg">Return to Home</a>
+                </div>
+            </div>
         </div>
     </div>
 </div>
 {% endblock %}
+

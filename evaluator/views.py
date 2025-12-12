@@ -7,8 +7,9 @@ from django.contrib.auth import login
 from django.conf import settings
 from django.contrib import messages
 from django.core.exceptions import ValidationError
+from django.utils import timezone
 from .forms import ClinicianRegistrationForm, EvaluationForm, ClinicianProfileForm
-from .models import Evaluation, Invitation
+from .models import Evaluation, Invitation, Assignment, Image, ImageSet
 
 def register(request):
     token_str = request.GET.get('token') or request.POST.get('token')
@@ -57,57 +58,124 @@ def register(request):
 
 @login_required
 def evaluate_image(request):
-    # Get all evaluated images by this user
-    evaluated_images = Evaluation.objects.filter(clinician=request.user).values_list('image_path', flat=True)
+    # Get all active assignments for this clinician
+    assignments = Assignment.objects.filter(
+        clinician=request.user,
+        image_set__is_active=True,
+        is_completed=False
+    ).select_related('image_set')
     
-    # Get all available images
-    real_images = []
-    synth_images = []
-    
-    if os.path.exists(settings.REAL_IMAGES_DIR):
-        real_images = [os.path.join('real', f) for f in os.listdir(settings.REAL_IMAGES_DIR) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
-    
-    if os.path.exists(settings.SYNTH_IMAGES_DIR):
-        synth_images = [os.path.join('synth', f) for f in os.listdir(settings.SYNTH_IMAGES_DIR) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+    if not assignments.exists():
+        # Check if there are any completed assignments
+        completed_assignments = Assignment.objects.filter(
+            clinician=request.user,
+            is_completed=True
+        ).exists()
         
-    all_images = real_images + synth_images
+        if completed_assignments:
+            return render(request, 'evaluator/done.html', {
+                'message': 'You have completed all your assigned evaluations!'
+            })
+        else:
+            return render(request, 'evaluator/done.html', {
+                'message': 'You have no image sets assigned for evaluation. Please contact your administrator.'
+            })
     
-    # Filter out evaluated ones
-    remaining_images = [img for img in all_images if img not in evaluated_images]
+    # Get all images from assigned image sets
+    assigned_image_ids = []
+    for assignment in assignments:
+        assigned_image_ids.extend(
+            assignment.image_set.images.values_list('id', flat=True)
+        )
     
-    if not remaining_images:
-        return render(request, 'evaluator/done.html')
+    # Get already evaluated image IDs
+    evaluated_image_ids = Evaluation.objects.filter(
+        clinician=request.user,
+        image__isnull=False
+    ).values_list('image_id', flat=True)
+    
+    # Filter out evaluated images
+    remaining_image_ids = set(assigned_image_ids) - set(evaluated_image_ids)
+    
+    if not remaining_image_ids:
+        # Mark all assignments as completed
+        for assignment in assignments:
+            if assignment.get_progress() == 100:
+                assignment.is_completed = True
+                assignment.completed_at = timezone.now()
+                assignment.save()
         
+        return render(request, 'evaluator/done.html', {
+            'message': 'You have completed all your assigned evaluations!'
+        })
+    
     if request.method == 'POST':
         form = EvaluationForm(request.POST)
         if form.is_valid():
             evaluation = form.save(commit=False)
             evaluation.clinician = request.user
-            # The image path comes from the hidden input or session? 
-            # Better to pass it via hidden field in the form or keep it in session.
-            # Let's use a hidden input in the template and retrieve it here.
-            image_path = request.POST.get('image_path')
             
-            # Verify the image path is valid and one of the remaining ones (security check)
-            # But strictly speaking, if we just trust the hidden field for now it's easier. 
-            # Ideally we should re-validate.
+            # Get the image ID from the hidden field
+            image_id = request.POST.get('image_id')
             
-            evaluation.image_path = image_path
-            evaluation.save()
-            return redirect('evaluate')
+            try:
+                image = Image.objects.get(id=image_id)
+                
+                # Verify this image is in one of the user's assignments
+                if image.id not in assigned_image_ids:
+                    messages.error(request, 'Invalid image selection.')
+                    return redirect('evaluate')
+                
+                # Check if already evaluated
+                if Evaluation.objects.filter(clinician=request.user, image=image).exists():
+                    messages.warning(request, 'You have already evaluated this image.')
+                    return redirect('evaluate')
+                
+                evaluation.image = image
+                evaluation.save()
+                
+                # Check if any assignments are now complete
+                for assignment in assignments:
+                    if assignment.get_progress() == 100 and not assignment.is_completed:
+                        assignment.is_completed = True
+                        assignment.completed_at = timezone.now()
+                        assignment.save()
+                
+                return redirect('evaluate')
+                
+            except Image.DoesNotExist:
+                messages.error(request, 'Invalid image.')
+                return redirect('evaluate')
     else:
-        # Pick a random image
-        selected_image = random.choice(remaining_images)
+        # Pick a random image from remaining ones
+        selected_image = Image.objects.filter(id__in=remaining_image_ids).order_by('?').first()
+        
+        if not selected_image:
+            return render(request, 'evaluator/done.html', {
+                'message': 'No more images to evaluate.'
+            })
+        
         form = EvaluationForm()
         
+        # Calculate progress
+        total_assigned = len(assigned_image_ids)
+        total_evaluated = len(evaluated_image_ids)
+        progress_percentage = (total_evaluated / total_assigned * 100) if total_assigned > 0 else 0
+        
         context = {
-            'image_url': f"{settings.MEDIA_URL}{selected_image}",
-            'image_path': selected_image,
-            'form': form
+            'image_url': selected_image.file.url,
+            'image_id': selected_image.id,
+            'form': form,
+            'progress': {
+                'evaluated': total_evaluated,
+                'total': total_assigned,
+                'percentage': progress_percentage
+            }
         }
         return render(request, 'evaluator/evaluate.html', context)
 
-    return render(request, 'evaluator/evaluate.html', {'form': form}) # Fallback
+    return render(request, 'evaluator/evaluate.html', {'form': form})
+
 
 def landing(request):
     return render(request, 'evaluator/landing.html')
@@ -126,7 +194,7 @@ def profile(request):
 
 @login_required
 def admin_panel(request):
-    """Admin panel showing clinician evaluation accuracy and statistics"""
+    """Admin panel showing per-assignment evaluation statistics"""
     # Check if user is admin/superuser
     if not request.user.is_superuser:
         messages.error(request, 'You do not have permission to access this page.')
@@ -135,41 +203,45 @@ def admin_panel(request):
     from django.db.models import Count, Avg, Q
     from .models import Clinician
     
-    # Get all clinicians with evaluations
-    clinicians_data = []
+    # Get all assignments with related data
+    assignments = Assignment.objects.select_related(
+        'clinician', 'image_set', 'assigned_by'
+    ).prefetch_related('image_set__images').all()
     
-    # Get total counts for overall statistics
-    total_evaluations = Evaluation.objects.count()
+    assignments_data = []
     
-    # Calculate overall accuracy
-    correct_count = 0
-    for eval in Evaluation.objects.all():
-        # Determine if evaluation is correct
-        is_real_image = eval.image_path.startswith('real/')
-        if (is_real_image and eval.is_real) or (not is_real_image and not eval.is_real):
-            correct_count += 1
-    
-    overall_accuracy = (correct_count / total_evaluations * 100) if total_evaluations > 0 else 0
-    
-    # Count total real and synthetic images
-    total_real_images = 0
-    total_synth_images = 0
-    if os.path.exists(settings.REAL_IMAGES_DIR):
-        total_real_images = len([f for f in os.listdir(settings.REAL_IMAGES_DIR) 
-                                 if f.lower().endswith(('.png', '.jpg', '.jpeg'))])
-    if os.path.exists(settings.SYNTH_IMAGES_DIR):
-        total_synth_images = len([f for f in os.listdir(settings.SYNTH_IMAGES_DIR) 
-                                  if f.lower().endswith(('.png', '.jpg', '.jpeg'))])
-    
-    # Process each clinician
-    for clinician in Clinician.objects.all():
-        evaluations = Evaluation.objects.filter(clinician=clinician)
+    for assignment in assignments:
+        # Get evaluations for this specific assignment
+        evaluations = Evaluation.objects.filter(
+            clinician=assignment.clinician,
+            image__image_set=assignment.image_set
+        ).select_related('image')
+        
         total = evaluations.count()
+        total_images = assignment.image_set.images.count()
         
         if total == 0:
-            continue  # Skip clinicians with no evaluations
+            # Assignment not started yet
+            assignments_data.append({
+                'assignment_id': assignment.id,
+                'clinician': assignment.clinician,
+                'image_set': assignment.image_set,
+                'assigned_at': assignment.assigned_at,
+                'assigned_by': assignment.assigned_by,
+                'is_completed': assignment.is_completed,
+                'completed_at': assignment.completed_at,
+                'total_images': total_images,
+                'total_evaluations': 0,
+                'progress': 0,
+                'accuracy': None,
+                'real_accuracy': None,
+                'synth_accuracy': None,
+                'avg_confidence': None,
+                'confidence_dist': {1: 0, 2: 0, 3: 0, 4: 0, 5: 0},
+            })
+            continue
         
-        # Calculate accuracy
+        # Calculate accuracy metrics
         correct = 0
         real_evaluated = 0
         real_correct = 0
@@ -180,8 +252,8 @@ def admin_panel(request):
         confidence_counts = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
         
         for eval in evaluations:
-            # Determine if image is real based on path
-            is_real_image = eval.image_path.startswith('real/')
+            # Get the actual image type
+            is_real_image = eval.image.is_real
             
             # Count by type
             if is_real_image:
@@ -200,8 +272,9 @@ def admin_panel(request):
         
         # Calculate percentages
         accuracy = (correct / total * 100) if total > 0 else 0
-        real_accuracy = (real_correct / real_evaluated * 100) if real_evaluated > 0 else 0
-        synth_accuracy = (synth_correct / synth_evaluated * 100) if synth_evaluated > 0 else 0
+        real_accuracy = (real_correct / real_evaluated * 100) if real_evaluated > 0 else None
+        synth_accuracy = (synth_correct / synth_evaluated * 100) if synth_evaluated > 0 else None
+        progress = (total / total_images * 100) if total_images > 0 else 0
         
         # Calculate average confidence
         avg_confidence = evaluations.aggregate(Avg('confidence'))['confidence__avg'] or 0
@@ -211,13 +284,17 @@ def admin_panel(request):
         for level in range(1, 6):
             confidence_dist[level] = (confidence_counts[level] / total * 100) if total > 0 else 0
         
-        clinicians_data.append({
-            'id': clinician.id,
-            'username': clinician.username,
-            'email': clinician.email,
-            'title': clinician.title,
-            'years_experience': clinician.years_experience,
+        assignments_data.append({
+            'assignment_id': assignment.id,
+            'clinician': assignment.clinician,
+            'image_set': assignment.image_set,
+            'assigned_at': assignment.assigned_at,
+            'assigned_by': assignment.assigned_by,
+            'is_completed': assignment.is_completed,
+            'completed_at': assignment.completed_at,
+            'total_images': total_images,
             'total_evaluations': total,
+            'progress': progress,
             'correct_evaluations': correct,
             'incorrect_evaluations': total - correct,
             'accuracy': accuracy,
@@ -231,15 +308,29 @@ def admin_panel(request):
             'confidence_dist': confidence_dist,
         })
     
-    # Sort by accuracy (descending)
-    clinicians_data.sort(key=lambda x: x['accuracy'], reverse=True)
+    # Sort by assignment date (most recent first)
+    assignments_data.sort(key=lambda x: x['assigned_at'], reverse=True)
+    
+    # Calculate overall statistics
+    total_assignments = len(assignments_data)
+    completed_assignments = sum(1 for a in assignments_data if a['is_completed'])
+    total_evaluations = sum(a['total_evaluations'] for a in assignments_data)
+    
+    # Calculate overall accuracy (only for assignments with evaluations)
+    assignments_with_evals = [a for a in assignments_data if a['total_evaluations'] > 0]
+    if assignments_with_evals:
+        overall_accuracy = sum(a['accuracy'] * a['total_evaluations'] for a in assignments_with_evals) / total_evaluations
+    else:
+        overall_accuracy = 0
     
     context = {
-        'clinicians': clinicians_data,
+        'assignments': assignments_data,
+        'total_assignments': total_assignments,
+        'completed_assignments': completed_assignments,
+        'in_progress_assignments': total_assignments - completed_assignments,
         'total_evaluations': total_evaluations,
         'overall_accuracy': overall_accuracy,
-        'total_real_images': total_real_images,
-        'total_synth_images': total_synth_images,
     }
     
     return render(request, 'evaluator/admin_panel.html', context)
+

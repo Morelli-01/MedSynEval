@@ -1,13 +1,12 @@
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
+from django.views.decorators.csrf import csrf_exempt
 from django.core.exceptions import ValidationError
 from django.contrib.auth.decorators import login_required
-from .models import Invitation, Evaluation
+from django.utils import timezone
+from .models import Invitation, Evaluation, Assignment, Image, ImageSet
 import uuid
 import json
-import os
-import random
-from django.conf import settings
 
 @require_http_methods(["POST"])
 def validate_token(request):
@@ -40,21 +39,54 @@ def submit_evaluation(request):
     """API endpoint to submit an evaluation"""
     try:
         data = json.loads(request.body)
-        image_path = data.get('image_path')
+        image_id = data.get('image_id')
         is_real = data.get('is_real')
         confidence = data.get('confidence')
         
         # Validate inputs
-        if not image_path or is_real is None or not confidence:
+        if not image_id or is_real is None or not confidence:
             return JsonResponse({'success': False, 'message': 'Missing required fields'}, status=400)
+        
+        # Get the image
+        try:
+            image = Image.objects.get(id=image_id)
+        except Image.DoesNotExist:
+            return JsonResponse({'success': False, 'message': 'Invalid image'}, status=404)
+        
+        # Verify user has access to this image through assignments
+        assignments = Assignment.objects.filter(
+            clinician=request.user,
+            image_set__is_active=True,
+            is_completed=False
+        )
+        
+        assigned_image_ids = []
+        for assignment in assignments:
+            assigned_image_ids.extend(
+                assignment.image_set.images.values_list('id', flat=True)
+            )
+        
+        if image.id not in assigned_image_ids:
+            return JsonResponse({'success': False, 'message': 'Unauthorized access to this image'}, status=403)
+        
+        # Check if already evaluated
+        if Evaluation.objects.filter(clinician=request.user, image=image).exists():
+            return JsonResponse({'success': False, 'message': 'Image already evaluated'}, status=400)
         
         # Create evaluation
         evaluation = Evaluation.objects.create(
             clinician=request.user,
-            image_path=image_path,
+            image=image,
             is_real=is_real,
             confidence=int(confidence)
         )
+        
+        # Check if any assignments are now complete
+        for assignment in assignments:
+            if assignment.get_progress() == 100 and not assignment.is_completed:
+                assignment.is_completed = True
+                assignment.completed_at = timezone.now()
+                assignment.save()
         
         return JsonResponse({
             'success': True,
@@ -72,43 +104,71 @@ def submit_evaluation(request):
 def get_next_image(request):
     """API endpoint to get the next unevaluated image"""
     try:
-        # Get all evaluated images by this user
-        evaluated_images = Evaluation.objects.filter(clinician=request.user).values_list('image_path', flat=True)
+        # Get all active assignments for this clinician
+        assignments = Assignment.objects.filter(
+            clinician=request.user,
+            image_set__is_active=True,
+            is_completed=False
+        ).select_related('image_set')
         
-        # Get all available images
-        real_images = []
-        synth_images = []
-        
-        if os.path.exists(settings.REAL_IMAGES_DIR):
-            real_images = [os.path.join('real', f) for f in os.listdir(settings.REAL_IMAGES_DIR) 
-                          if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
-        
-        if os.path.exists(settings.SYNTH_IMAGES_DIR):
-            synth_images = [os.path.join('synth', f) for f in os.listdir(settings.SYNTH_IMAGES_DIR) 
-                           if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
-            
-        all_images = real_images + synth_images
-        
-        # Filter out evaluated ones
-        remaining_images = [img for img in all_images if img not in evaluated_images]
-        
-        if not remaining_images:
+        if not assignments.exists():
             return JsonResponse({
                 'success': True,
                 'completed': True,
-                'message': 'All images have been evaluated'
+                'message': 'No active assignments'
             })
         
-        # Pick a random image
-        selected_image = random.choice(remaining_images)
+        # Get all images from assigned image sets
+        assigned_image_ids = []
+        for assignment in assignments:
+            assigned_image_ids.extend(
+                assignment.image_set.images.values_list('id', flat=True)
+            )
+        
+        # Get already evaluated image IDs
+        evaluated_image_ids = Evaluation.objects.filter(
+            clinician=request.user,
+            image__isnull=False
+        ).values_list('image_id', flat=True)
+        
+        # Filter out evaluated images
+        remaining_image_ids = set(assigned_image_ids) - set(evaluated_image_ids)
+        
+        if not remaining_image_ids:
+            return JsonResponse({
+                'success': True,
+                'completed': True,
+                'message': 'All assigned images have been evaluated'
+            })
+        
+        # Pick a random image from remaining ones
+        selected_image = Image.objects.filter(id__in=remaining_image_ids).order_by('?').first()
+        
+        if not selected_image:
+            return JsonResponse({
+                'success': True,
+                'completed': True,
+                'message': 'No more images to evaluate'
+            })
+        
+        # Calculate progress
+        total_assigned = len(assigned_image_ids)
+        total_evaluated = len(evaluated_image_ids)
+        progress_percentage = (total_evaluated / total_assigned * 100) if total_assigned > 0 else 0
         
         return JsonResponse({
             'success': True,
             'completed': False,
-            'image_url': f"{settings.MEDIA_URL}{selected_image}",
-            'image_path': selected_image,
-            'remaining': len(remaining_images)
+            'image_url': selected_image.file.url,
+            'image_id': selected_image.id,
+            'remaining': len(remaining_image_ids),
+            'progress': {
+                'evaluated': total_evaluated,
+                'total': total_assigned,
+                'percentage': progress_percentage
+            }
         })
         
     except Exception as e:
         return JsonResponse({'success': False, 'message': str(e)}, status=500)
+

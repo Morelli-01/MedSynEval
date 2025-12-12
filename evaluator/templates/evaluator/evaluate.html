@@ -21,22 +21,12 @@
                 </div>
             </div>
 
-            <!-- Completion Message (hidden by default) -->
-            <div id="completionMessage" class="card shadow-lg border-0 d-none">
-                <div class="card-body text-center py-5">
-                    <h4 class="fs-3 text-success mb-3"><i class="bi bi-check-circle-fill"></i> All Done!</h4>
-                    <p class="lead mb-4">You have evaluated all available images. Thank you for your contribution!</p>
-                    <a href="{% url 'home' %}" class="btn btn-primary btn-lg">Return to Home</a>
-                </div>
-            </div>
-
             <!-- Main Evaluation Card -->
             <div id="evaluationContainer" class="card shadow-lg border-0 overflow-hidden" style="max-height: 85vh;">
                 <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
                     <h5 class="mb-0 fw-bold text-primary">
                         <i class="bi bi-clipboard-check me-2"></i>Image Evaluation
                     </h5>
-                    <div id="progressInfo" class="badge bg-light text-dark border fs-6">Loading...</div>
                 </div>
                 
                 <div class="row g-0 h-100">
@@ -61,9 +51,25 @@
                             <div class="p-4 flex-grow-1 overflow-auto custom-scrollbar">
                                 <div class="mb-4">
                                     <h6 class="text-uppercase text-muted fw-bold mb-3" style="font-size: 0.75rem; letter-spacing: 1px;">Assessment</h6>
-                                    <form id="evaluationForm">
+                                    <form method="post" id="evaluationForm">
                                         {% csrf_token %}
-                                        <input type="hidden" id="imagePath" value="{{ image_path }}">
+                                        <input type="hidden" name="image_id" id="imageId" value="{{ image_id }}">
+                                        
+                                        <!-- Progress Display -->
+                                        {% if progress %}
+                                        <div class="mb-3 p-2 bg-light rounded">
+                                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                                <small class="text-muted">Progress</small>
+                                                <small class="fw-bold">{{ progress.evaluated }}/{{ progress.total }}</small>
+                                            </div>
+                                            <div class="progress" style="height: 6px;">
+                                                <div class="progress-bar bg-success" role="progressbar" 
+                                                     style="width: {{ progress.percentage }}%;" 
+                                                     aria-valuenow="{{ progress.percentage }}" 
+                                                     aria-valuemin="0" aria-valuemax="100"></div>
+                                            </div>
+                                        </div>
+                                        {% endif %}
                                         
                                         <!-- Image Type Selection -->
                                         <div class="mb-4">
@@ -258,9 +264,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const submitBtn = document.getElementById('submitBtn');
     const medicalImage = document.getElementById('medicalImage');
     const imageViewer = document.getElementById('imageViewer');
-    const progressInfo = document.getElementById('progressInfo');
-    const completionMessage = document.getElementById('completionMessage');
-    const evaluationContainer = document.getElementById('evaluationContainer');
+    const imageIdInput = document.getElementById('imageId');
     
     // Map-like image viewer
     let scale = 1;
@@ -444,7 +448,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     'X-CSRFToken': '{{ csrf_token }}'
                 },
                 body: JSON.stringify({
-                    image_path: document.getElementById('imagePath').value,
+                    image_id: imageIdInput.value,
                     is_real: isRealInput.value === 'true',
                     confidence: parseInt(confidenceInput.value)
                 })
@@ -462,12 +466,13 @@ document.addEventListener('DOMContentLoaded', function() {
             } else {
                 alert('Error submitting evaluation: ' + data.message);
                 submitBtn.disabled = false;
-                submitBtn.innerHTML = '<i class="bi bi-check-circle"></i> Submit Evaluation';
+                submitBtn.innerHTML = 'Submit Evaluation';
             }
         } catch (error) {
+            console.error('Error:', error);
             alert('Network error. Please try again.');
             submitBtn.disabled = false;
-            submitBtn.innerHTML = '<i class="bi bi-check-circle"></i> Submit Evaluation';
+            submitBtn.innerHTML = 'Submit Evaluation';
         }
     });
     
@@ -478,30 +483,44 @@ document.addEventListener('DOMContentLoaded', function() {
             
             if (data.success) {
                 if (data.completed) {
-                    // Show completion message
-                    evaluationContainer.classList.add('d-none');
-                    completionMessage.classList.remove('d-none');
-                    progressInfo.textContent = 'Completed!';
+                    // Redirect to done page
+                    window.location.href = '{% url "evaluate" %}';
                 } else {
                     // Load new image
                     medicalImage.src = data.image_url;
-                    document.getElementById('imagePath').value = data.image_path;
-                    progressInfo.textContent = `${data.remaining} image${data.remaining !== 1 ? 's' : ''} remaining`;
+                    imageIdInput.value = data.image_id;
+                    
+                    // Update progress
+                    if (data.progress) {
+                        const progressBar = document.querySelector('.progress-bar');
+                        const progressText = document.querySelector('.progress').previousElementSibling.querySelector('.fw-bold');
+                        
+                        if (progressBar) {
+                            progressBar.style.width = data.progress.percentage + '%';
+                            progressBar.setAttribute('aria-valuenow', data.progress.percentage);
+                        }
+                        
+                        if (progressText) {
+                            progressText.textContent = `${data.progress.evaluated}/${data.progress.total}`;
+                        }
+                    }
                     
                     // Re-enable submit button
                     submitBtn.disabled = false;
-                    submitBtn.innerHTML = '<i class="bi bi-check-circle"></i> Submit Evaluation';
+                    submitBtn.innerHTML = 'Submit Evaluation';
                 }
             } else {
                 alert('Error loading next image: ' + data.message);
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = 'Submit Evaluation';
             }
         } catch (error) {
+            console.error('Error:', error);
             alert('Network error loading next image.');
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = 'Submit Evaluation';
         }
     }
-    
-    // Initialize progress info
-    loadNextImage();
 });
 </script>
 {% endblock %}

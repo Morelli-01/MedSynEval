@@ -1,7 +1,7 @@
 {% extends 'evaluator/base.html' %}
 {% load admin_filters %}
 
-{% block title %}Admin Panel - Clinician Analytics{% endblock %}
+{% block title %}Admin Panel - Assignment Analytics{% endblock %}
 
 {% block content %}
 <div class="container-fluid px-2 px-lg-4 mt-4">
@@ -11,14 +11,14 @@
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <div>
                     <h2 class="fw-bold text-primary mb-1">
-                        <i class="bi bi-graph-up-arrow me-2"></i>Clinician Analytics Dashboard
+                        <i class="bi bi-graph-up-arrow me-2"></i>Assignment Analytics Dashboard
                     </h2>
-                    <p class="text-muted mb-0">Evaluation accuracy and performance metrics</p>
+                    <p class="text-muted mb-0">Per-assignment evaluation statistics and performance metrics</p>
                 </div>
                 <div class="text-end">
                     <div class="badge bg-primary fs-6 px-3 py-2">
-                        <i class="bi bi-people-fill me-1"></i>
-                        {{ clinicians|length }} Clinician{{ clinicians|length|pluralize }}
+                        <i class="bi bi-clipboard-check me-1"></i>
+                        {{ total_assignments }} Assignment{{ total_assignments|pluralize }}
                     </div>
                 </div>
             </div>
@@ -31,8 +31,8 @@
                             <div class="text-primary mb-2">
                                 <i class="bi bi-clipboard-check fs-1"></i>
                             </div>
-                            <h3 class="fw-bold mb-0">{{ total_evaluations }}</h3>
-                            <p class="text-muted small mb-0">Total Evaluations</p>
+                            <h3 class="fw-bold mb-0">{{ total_assignments }}</h3>
+                            <p class="text-muted small mb-0">Total Assignments</p>
                         </div>
                     </div>
                 </div>
@@ -42,19 +42,8 @@
                             <div class="text-success mb-2">
                                 <i class="bi bi-check-circle fs-1"></i>
                             </div>
-                            <h3 class="fw-bold mb-0">{{ overall_accuracy|floatformat:1 }}%</h3>
-                            <p class="text-muted small mb-0">Overall Accuracy</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="card border-0 shadow-sm h-100">
-                        <div class="card-body text-center">
-                            <div class="text-info mb-2">
-                                <i class="bi bi-camera fs-1"></i>
-                            </div>
-                            <h3 class="fw-bold mb-0">{{ total_real_images }}</h3>
-                            <p class="text-muted small mb-0">Real Images</p>
+                            <h3 class="fw-bold mb-0">{{ completed_assignments }}</h3>
+                            <p class="text-muted small mb-0">Completed</p>
                         </div>
                     </div>
                 </div>
@@ -62,20 +51,31 @@
                     <div class="card border-0 shadow-sm h-100">
                         <div class="card-body text-center">
                             <div class="text-warning mb-2">
-                                <i class="bi bi-cpu fs-1"></i>
+                                <i class="bi bi-hourglass-split fs-1"></i>
                             </div>
-                            <h3 class="fw-bold mb-0">{{ total_synth_images }}</h3>
-                            <p class="text-muted small mb-0">Synthetic Images</p>
+                            <h3 class="fw-bold mb-0">{{ in_progress_assignments }}</h3>
+                            <p class="text-muted small mb-0">In Progress</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body text-center">
+                            <div class="text-info mb-2">
+                                <i class="bi bi-percent fs-1"></i>
+                            </div>
+                            <h3 class="fw-bold mb-0">{{ overall_accuracy|floatformat:1 }}%</h3>
+                            <p class="text-muted small mb-0">Overall Accuracy</p>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Clinicians Table -->
+            <!-- Assignments Table -->
             <div class="card border-0 shadow-sm">
                 <div class="card-header bg-white py-3 border-bottom">
                     <h5 class="mb-0 fw-bold">
-                        <i class="bi bi-table me-2"></i>Clinician Performance
+                        <i class="bi bi-table me-2"></i>Assignment Performance
                     </h5>
                 </div>
                 <div class="card-body p-0">
@@ -84,86 +84,92 @@
                             <thead class="bg-light">
                                 <tr>
                                     <th class="px-4 py-3 fw-bold text-uppercase small">Clinician</th>
-                                    <th class="px-4 py-3 fw-bold text-uppercase small text-center">Total Evaluations</th>
-                                    <th class="px-4 py-3 fw-bold text-uppercase small text-center">Correct</th>
-                                    <th class="px-4 py-3 fw-bold text-uppercase small text-center">Incorrect</th>
+                                    <th class="px-4 py-3 fw-bold text-uppercase small">ImageSet</th>
+                                    <th class="px-4 py-3 fw-bold text-uppercase small text-center">Progress</th>
                                     <th class="px-4 py-3 fw-bold text-uppercase small text-center">Accuracy</th>
-                                    <th class="px-4 py-3 fw-bold text-uppercase small text-center">Avg Confidence</th>
-                                    <th class="px-4 py-3 fw-bold text-uppercase small text-center">Experience</th>
+                                    <th class="px-4 py-3 fw-bold text-uppercase small text-center">Status</th>
+                                    <th class="px-4 py-3 fw-bold text-uppercase small text-center">Assigned</th>
                                     <th class="px-4 py-3 fw-bold text-uppercase small text-center">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {% for clinician in clinicians %}
+                                {% for assignment in assignments %}
                                 <tr>
                                     <td class="px-4 py-3">
                                         <div class="d-flex align-items-center">
                                             <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3" 
                                                  style="width: 40px; height: 40px; font-weight: bold;">
-                                                {{ clinician.username|slice:":1"|upper }}
+                                                {{ assignment.clinician.username|slice:":1"|upper }}
                                             </div>
                                             <div>
-                                                <div class="fw-bold">{{ clinician.username }}</div>
-                                                {% if clinician.title %}
-                                                <small class="text-muted">{{ clinician.title }}</small>
+                                                <div class="fw-bold">{{ assignment.clinician.username }}</div>
+                                                {% if assignment.clinician.title %}
+                                                <small class="text-muted">{{ assignment.clinician.title }}</small>
                                                 {% endif %}
                                             </div>
                                         </div>
                                     </td>
-                                    <td class="px-4 py-3 text-center">
-                                        <span class="badge bg-light text-dark border fs-6">{{ clinician.total_evaluations }}</span>
-                                    </td>
-                                    <td class="px-4 py-3 text-center">
-                                        <span class="badge bg-success fs-6">{{ clinician.correct_evaluations }}</span>
-                                    </td>
-                                    <td class="px-4 py-3 text-center">
-                                        <span class="badge bg-danger fs-6">{{ clinician.incorrect_evaluations }}</span>
+                                    <td class="px-4 py-3">
+                                        <div class="fw-bold">{{ assignment.image_set.name }}</div>
+                                        <small class="text-muted">{{ assignment.total_images }} images</small>
                                     </td>
                                     <td class="px-4 py-3 text-center">
                                         <div class="d-flex align-items-center justify-content-center">
                                             <div class="progress" style="width: 100px; height: 8px;">
                                                 <div class="progress-bar 
-                                                    {% if clinician.accuracy >= 80 %}bg-success
-                                                    {% elif clinician.accuracy >= 60 %}bg-warning
+                                                    {% if assignment.progress >= 100 %}bg-success
+                                                    {% elif assignment.progress >= 50 %}bg-warning
                                                     {% else %}bg-danger{% endif %}" 
                                                     role="progressbar" 
-                                                    style="width: {{ clinician.accuracy }}%"
-                                                    aria-valuenow="{{ clinician.accuracy }}" 
+                                                    style="width: {{ assignment.progress }}%"
+                                                    aria-valuenow="{{ assignment.progress }}" 
                                                     aria-valuemin="0" 
                                                     aria-valuemax="100">
                                                 </div>
                                             </div>
-                                            <span class="ms-2 fw-bold">{{ clinician.accuracy|floatformat:1 }}%</span>
+                                            <span class="ms-2 fw-bold small">{{ assignment.progress|floatformat:0 }}%</span>
                                         </div>
+                                        <small class="text-muted">{{ assignment.total_evaluations }}/{{ assignment.total_images }}</small>
                                     </td>
                                     <td class="px-4 py-3 text-center">
-                                        <div class="d-flex align-items-center justify-content-center">
-                                            {% for i in "12345" %}
-                                                {% if forloop.counter <= clinician.avg_confidence|floatformat:0|add:"0" %}
-                                                    <i class="bi bi-star-fill text-warning"></i>
-                                                {% else %}
-                                                    <i class="bi bi-star text-muted"></i>
-                                                {% endif %}
-                                            {% endfor %}
-                                            <span class="ms-2 small text-muted">({{ clinician.avg_confidence|floatformat:1 }})</span>
-                                        </div>
+                                        {% if assignment.accuracy is not None %}
+                                            <span class="badge 
+                                                {% if assignment.accuracy >= 80 %}bg-success
+                                                {% elif assignment.accuracy >= 60 %}bg-warning
+                                                {% else %}bg-danger{% endif %} fs-6">
+                                                {{ assignment.accuracy|floatformat:1 }}%
+                                            </span>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
                                     </td>
                                     <td class="px-4 py-3 text-center">
-                                        <span class="badge bg-info text-dark">{{ clinician.years_experience }} year{{ clinician.years_experience|pluralize }}</span>
+                                        {% if assignment.is_completed %}
+                                            <span class="badge bg-success">
+                                                <i class="bi bi-check-circle me-1"></i>Completed
+                                            </span>
+                                        {% else %}
+                                            <span class="badge bg-warning text-dark">
+                                                <i class="bi bi-hourglass-split me-1"></i>In Progress
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="px-4 py-3 text-center">
+                                        <small class="text-muted">{{ assignment.assigned_at|date:"M d, Y" }}</small>
                                     </td>
                                     <td class="px-4 py-3 text-center">
                                         <button class="btn btn-sm btn-outline-primary" 
                                                 data-bs-toggle="modal" 
-                                                data-bs-target="#detailsModal{{ clinician.id }}">
+                                                data-bs-target="#detailsModal{{ assignment.assignment_id }}">
                                             <i class="bi bi-eye"></i> Details
                                         </button>
                                     </td>
                                 </tr>
                                 {% empty %}
                                 <tr>
-                                    <td colspan="8" class="text-center py-5 text-muted">
+                                    <td colspan="7" class="text-center py-5 text-muted">
                                         <i class="bi bi-inbox fs-1 d-block mb-2"></i>
-                                        No clinicians have completed evaluations yet.
+                                        No assignments created yet.
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -176,92 +182,149 @@
     </div>
 </div>
 
-<!-- Modals are now outside the table structure -->
-{% for clinician in clinicians %}
-<div class="modal fade" id="detailsModal{{ clinician.id }}" tabindex="-1" aria-hidden="true">
+<!-- Detail Modals -->
+{% for assignment in assignments %}
+<div class="modal fade" id="detailsModal{{ assignment.assignment_id }}" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content border-0 shadow-lg">
             <div class="modal-header bg-white border-bottom">
-                <div class="d-flex align-items-center">
-                    <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3" 
-                         style="width: 48px; height: 48px; font-size: 1.2rem; font-weight: bold;">
-                        {{ clinician.username|slice:":1"|upper }}
-                    </div>
-                    <div>
-                        <h5 class="modal-title fw-bold">{{ clinician.username }}</h5>
-                        <div class="text-muted small">
-                            {{ clinician.title|default:"Clinician" }} • {{ clinician.years_experience }} Year{{ clinician.years_experience|pluralize }} Experience
-                        </div>
+                <div>
+                    <h5 class="modal-title fw-bold">Assignment Details</h5>
+                    <div class="text-muted small">
+                        {{ assignment.clinician.username }} • {{ assignment.image_set.name }}
                     </div>
                 </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body p-4 bg-light">
                 <div class="row g-4">
-                    <!-- Left Column: Performance Stats -->
-                    <div class="col-md-5">
+                    <!-- Left Column: Assignment Info -->
+                    <div class="col-md-6">
                         <div class="bg-white p-4 rounded-3 shadow-sm h-100">
-                            <h6 class="fw-bold text-uppercase text-muted small mb-4">Performance Breakdown</h6>
+                            <h6 class="fw-bold text-uppercase text-muted small mb-4">Assignment Information</h6>
                             
-                            <div class="mb-4">
-                                <div class="d-flex justify-content-between align-items-end mb-1">
-                                    <span class="text-muted">Real Images</span>
-                                    <span class="fw-bold fs-5">{{ clinician.real_accuracy|floatformat:1 }}%</span>
-                                </div>
-                                <div class="progress" style="height: 6px;">
-                                    <div class="progress-bar bg-success" role="progressbar" style="width: {{ clinician.real_accuracy }}%"></div>
-                                </div>
-                                <div class="small text-muted mt-1">
-                                    {{ clinician.real_correct }} correct / {{ clinician.real_evaluated }} total
-                                </div>
+                            <div class="mb-3">
+                                <small class="text-muted d-block">Clinician</small>
+                                <div class="fw-bold">{{ assignment.clinician.username }}</div>
+                                <small class="text-muted">{{ assignment.clinician.title|default:"Clinician" }} • {{ assignment.clinician.years_experience }} years exp.</small>
                             </div>
-
+                            
+                            <div class="mb-3">
+                                <small class="text-muted d-block">ImageSet</small>
+                                <div class="fw-bold">{{ assignment.image_set.name }}</div>
+                                <small class="text-muted">{{ assignment.total_images }} total images</small>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <small class="text-muted d-block">Assigned By</small>
+                                <div class="fw-bold">{{ assignment.assigned_by.username|default:"System" }}</div>
+                                <small class="text-muted">{{ assignment.assigned_at|date:"F j, Y g:i A" }}</small>
+                            </div>
+                            
+                            {% if assignment.is_completed %}
                             <div class="mb-0">
-                                <div class="d-flex justify-content-between align-items-end mb-1">
-                                    <span class="text-muted">Synthetic Images</span>
-                                    <span class="fw-bold fs-5">{{ clinician.synth_accuracy|floatformat:1 }}%</span>
-                                </div>
-                                <div class="progress" style="height: 6px;">
-                                    <div class="progress-bar bg-warning" role="progressbar" style="width: {{ clinician.synth_accuracy }}%"></div>
-                                </div>
-                                <div class="small text-muted mt-1">
-                                    {{ clinician.synth_correct }} correct / {{ clinician.synth_evaluated }} total
-                                </div>
+                                <small class="text-muted d-block">Completed</small>
+                                <div class="fw-bold text-success">{{ assignment.completed_at|date:"F j, Y g:i A" }}</div>
                             </div>
+                            {% endif %}
                         </div>
                     </div>
 
-                    <!-- Right Column: Confidence Chart -->
-                    <div class="col-md-7">
+                    <!-- Right Column: Performance Stats -->
+                    <div class="col-md-6">
                         <div class="bg-white p-4 rounded-3 shadow-sm h-100">
-                            <h6 class="fw-bold text-uppercase text-muted small mb-4">Confidence Distribution</h6>
-                            <div class="confidence-chart">
-                                {% for conf in "12345" %}
-                                <div class="mb-3">
-                                    <div class="d-flex justify-content-between align-items-center mb-1">
-                                        <div class="d-flex align-items-center">
-                                            <span class="badge bg-light text-dark border me-2">{{ forloop.counter }}</span>
-                                            <span class="small text-muted">Confidence</span>
-                                        </div>
-                                        <span class="fw-bold small">{{ clinician.confidence_dist|get_item:forloop.counter|floatformat:0 }}%</span>
-                                    </div>
-                                    <div class="progress" style="height: 10px; background-color: #f1f3f5;">
-                                        <div class="progress-bar bg-primary opacity-75" 
-                                             role="progressbar" 
-                                             style="width: {{ clinician.confidence_dist|get_item:forloop.counter }}%">
-                                        </div>
+                            <h6 class="fw-bold text-uppercase text-muted small mb-4">Performance Metrics</h6>
+                            
+                            {% if assignment.total_evaluations > 0 %}
+                            <div class="mb-4">
+                                <div class="d-flex justify-content-between align-items-end mb-1">
+                                    <span class="text-muted">Real Images</span>
+                                    {% if assignment.real_accuracy is not None %}
+                                    <span class="fw-bold fs-5">{{ assignment.real_accuracy|floatformat:1 }}%</span>
+                                    {% else %}
+                                    <span class="text-muted">-</span>
+                                    {% endif %}
+                                </div>
+                                {% if assignment.real_accuracy is not None %}
+                                <div class="progress" style="height: 6px;">
+                                    <div class="progress-bar bg-success" role="progressbar" style="width: {{ assignment.real_accuracy }}%"></div>
+                                </div>
+                                <div class="small text-muted mt-1">
+                                    {{ assignment.real_correct }} correct / {{ assignment.real_evaluated }} total
+                                </div>
+                                {% endif %}
+                            </div>
+
+                            <div class="mb-4">
+                                <div class="d-flex justify-content-between align-items-end mb-1">
+                                    <span class="text-muted">Synthetic Images</span>
+                                    {% if assignment.synth_accuracy is not None %}
+                                    <span class="fw-bold fs-5">{{ assignment.synth_accuracy|floatformat:1 }}%</span>
+                                    {% else %}
+                                    <span class="text-muted">-</span>
+                                    {% endif %}
+                                </div>
+                                {% if assignment.synth_accuracy is not None %}
+                                <div class="progress" style="height: 6px;">
+                                    <div class="progress-bar bg-warning" role="progressbar" style="width: {{ assignment.synth_accuracy }}%"></div>
+                                </div>
+                                <div class="small text-muted mt-1">
+                                    {{ assignment.synth_correct }} correct / {{ assignment.synth_evaluated }} total
+                                </div>
+                                {% endif %}
+                            </div>
+
+                            <div class="mb-0">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span class="text-muted">Avg Confidence</span>
+                                    <div class="d-flex align-items-center">
+                                        {% for i in "12345" %}
+                                            {% if forloop.counter <= assignment.avg_confidence|floatformat:0|add:"0" %}
+                                                <i class="bi bi-star-fill text-warning"></i>
+                                            {% else %}
+                                                <i class="bi bi-star text-muted"></i>
+                                            {% endif %}
+                                        {% endfor %}
+                                        <span class="ms-2 small text-muted">({{ assignment.avg_confidence|floatformat:1 }})</span>
                                     </div>
                                 </div>
-                                {% endfor %}
                             </div>
+                            {% else %}
+                            <div class="text-center text-muted py-4">
+                                <i class="bi bi-hourglass-split fs-1 d-block mb-2"></i>
+                                No evaluations yet
+                            </div>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
                 
-                <div class="mt-4 pt-3 border-top text-center text-muted small">
-                    <i class="bi bi-clock me-1"></i> User joined {{ clinician.date_joined|date:"F j, Y" }} • 
-                    Email: {{ clinician.email|default:"Not provided" }}
+                {% if assignment.total_evaluations > 0 %}
+                <div class="mt-4">
+                    <div class="bg-white p-4 rounded-3 shadow-sm">
+                        <h6 class="fw-bold text-uppercase text-muted small mb-4">Confidence Distribution</h6>
+                        <div class="confidence-chart">
+                            {% for conf in "12345" %}
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <div class="d-flex align-items-center">
+                                        <span class="badge bg-light text-dark border me-2">{{ forloop.counter }}</span>
+                                        <span class="small text-muted">Confidence</span>
+                                    </div>
+                                    <span class="fw-bold small">{{ assignment.confidence_dist|get_item:forloop.counter|floatformat:0 }}%</span>
+                                </div>
+                                <div class="progress" style="height: 10px; background-color: #f1f3f5;">
+                                    <div class="progress-bar bg-primary opacity-75" 
+                                         role="progressbar" 
+                                         style="width: {{ assignment.confidence_dist|get_item:forloop.counter }}%">
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
                 </div>
+                {% endif %}
             </div>
         </div>
     </div>

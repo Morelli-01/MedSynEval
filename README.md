@@ -4,11 +4,14 @@ A Django-based web application for evaluating synthetic vs real medical images t
 
 ## Features
 
-- Invitation-based secure registration
-- Real-time image evaluation with pan/zoom viewer
-- Profile management for clinicians
-- Admin export of evaluations as JSON
-- MySQL database backend
+- **ImageSet Management**: Load and organize groups of images for evaluation
+- **Assignment System**: Assign specific image sets to clinicians
+- **Dynamic Evaluation**: Seamless evaluation using Fetch API (no page reloads)
+- **Progress Tracking**: Monitor evaluation progress in real-time
+- **Invitation-based Registration**: Secure clinician registration
+- **Interactive Image Viewer**: Pan/zoom viewer for detailed inspection
+- **Admin Analytics**: Export evaluations and view comprehensive statistics
+- **MySQL Database**: Robust data storage
 
 ## Quick Start
 
@@ -46,23 +49,44 @@ python manage.py runserver
 
 Visit `http://localhost:8000`
 
-## Project Structure
+## Loading Images
 
+### Quick Example
+
+Prepare your data folder:
 ```
-med_syn_eval/
-├── evaluator/          # Main app (models, views, templates)
-├── med_syn_eval/       # Project settings
-├── data/               # Image storage (real/ and synth/)
-└── static/             # Static files (favicon, etc.)
+data_folder/
+├── real/
+│   ├── image1.jpg
+│   └── ...
+└── synth/
+    ├── image1.jpg
+    └── ...
 ```
+
+Load images:
+```bash
+python manage.py load_imageset /path/to/data_folder "Study Name"
+```
+
+Then create assignments via admin panel at `http://localhost:8000/admin/`
+
+## Complete Documentation
+
+📖 **See [DOCUMENTATION.md](DOCUMENTATION.md) for complete guide including:**
+- Detailed loading instructions
+- Admin workflow
+- Clinician workflow
+- Dynamic evaluation system
+- API reference
+- Troubleshooting
+- Best practices
 
 ## Tech Stack
 
 - Django 5.0
 - MySQL 8.0+
 - Bootstrap 5
-- Vanilla JavaScript
+- Vanilla JavaScript with Fetch API
+- Pillow (image handling)
 
-## License
-
-[Your License Here]
