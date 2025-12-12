@@ -1,0 +1,130 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block title %}Load ImageSet from Folder{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">Home</a>
+    &rsaquo; <a href="{% url 'admin:evaluator_imageset_changelist' %}">Image Sets</a>
+    &rsaquo; Load from Folder
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid" style="max-width: 800px; margin: 40px auto;">
+    <div class="card shadow-sm border-0">
+        <div class="card-header bg-primary text-white py-3">
+            <h3 class="mb-0">
+                <i class="bi bi-folder-plus"></i> Load ImageSet from Folder
+            </h3>
+        </div>
+        <div class="card-body p-4">
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+
+            <div class="alert alert-info">
+                <h5><i class="bi bi-info-circle"></i> Instructions</h5>
+                <p class="mb-2">Your folder must have the following structure:</p>
+                <pre class="bg-light p-3 rounded"><code>your_folder/
+├── real/
+│   ├── image1.jpg
+│   ├── image2.png
+│   └── ...
+└── synth/
+    ├── image1.jpg
+    ├── image2.png
+    └── ...</code></pre>
+                <p class="mb-0"><strong>Supported formats:</strong> .jpg, .jpeg, .png</p>
+            </div>
+
+            <form method="post" class="mt-4">
+                {% csrf_token %}
+                
+                <div class="mb-4">
+                    <label for="folder_path" class="form-label fw-bold">
+                        <i class="bi bi-folder"></i> Folder Path
+                    </label>
+                    <input type="text" 
+                           class="form-control form-control-lg" 
+                           id="folder_path" 
+                           name="folder_path" 
+                           required
+                           placeholder="/absolute/path/to/folder"
+                           value="{{ request.POST.folder_path }}">
+                    <small class="form-text text-muted">
+                        Enter the absolute path to the folder containing real/ and synth/ subdirectories
+                    </small>
+                </div>
+
+                <div class="mb-4">
+                    <label for="imageset_name" class="form-label fw-bold">
+                        <i class="bi bi-tag"></i> ImageSet Name
+                    </label>
+                    <input type="text" 
+                           class="form-control form-control-lg" 
+                           id="imageset_name" 
+                           name="imageset_name" 
+                           required
+                           placeholder="e.g., Cardiac Study 2024"
+                           value="{{ request.POST.imageset_name }}">
+                    <small class="form-text text-muted">
+                        Choose a unique, descriptive name for this ImageSet
+                    </small>
+                </div>
+
+                <div class="mb-4">
+                    <label for="description" class="form-label fw-bold">
+                        <i class="bi bi-file-text"></i> Description (Optional)
+                    </label>
+                    <textarea class="form-control" 
+                              id="description" 
+                              name="description" 
+                              rows="3"
+                              placeholder="Add a description for this ImageSet...">{{ request.POST.description }}</textarea>
+                </div>
+
+                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                    <a href="{% url 'admin:evaluator_imageset_changelist' %}" class="btn btn-secondary btn-lg">
+                        <i class="bi bi-x-circle"></i> Cancel
+                    </a>
+                    <button type="submit" class="btn btn-primary btn-lg">
+                        <i class="bi bi-upload"></i> Load ImageSet
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+.card {
+    border-radius: 10px;
+}
+
+.card-header {
+    border-radius: 10px 10px 0 0 !important;
+}
+
+.form-control-lg {
+    border-radius: 8px;
+}
+
+.btn-lg {
+    padding: 12px 30px;
+    border-radius: 8px;
+}
+
+pre {
+    border: 1px solid #dee2e6;
+}
+</style>
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+{% endblock %}

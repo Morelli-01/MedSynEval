@@ -87,6 +87,7 @@ class ImageSetAdmin(admin.ModelAdmin):
     search_fields = ('name', 'description')
     readonly_fields = ('created_at', 'created_by', 'image_count', 'real_count', 'synth_count')
     inlines = [ImageInline]
+    change_list_template = 'admin/imageset_changelist.html'
     
     fieldsets = (
         ('Basic Information', {
@@ -117,6 +118,104 @@ class ImageSetAdmin(admin.ModelAdmin):
         if not change:  # Only set created_by on creation
             obj.created_by = request.user
         super().save_model(request, obj, form, change)
+    
+    def get_urls(self):
+        from django.urls import path
+        urls = super().get_urls()
+        custom_urls = [
+            path('load-from-folder/', self.admin_site.admin_view(self.load_from_folder_view), name='imageset_load_from_folder'),
+        ]
+        return custom_urls + urls
+    
+    def load_from_folder_view(self, request):
+        from django.shortcuts import render, redirect
+        from django.contrib import messages
+        from pathlib import Path
+        import os
+        
+        if request.method == 'POST':
+            folder_path = request.POST.get('folder_path')
+            imageset_name = request.POST.get('imageset_name')
+            description = request.POST.get('description', '')
+            
+            try:
+                folder_path = Path(folder_path)
+                
+                # Validate folder structure
+                if not folder_path.exists():
+                    messages.error(request, f"Folder '{folder_path}' does not exist")
+                    return render(request, 'admin/load_imageset_form.html')
+                
+                real_folder = folder_path / 'real'
+                synth_folder = folder_path / 'synth'
+                
+                if not real_folder.exists():
+                    messages.error(request, f"'real' subfolder not found in '{folder_path}'")
+                    return render(request, 'admin/load_imageset_form.html')
+                
+                if not synth_folder.exists():
+                    messages.error(request, f"'synth' subfolder not found in '{folder_path}'")
+                    return render(request, 'admin/load_imageset_form.html')
+                
+                # Check if ImageSet already exists
+                if ImageSet.objects.filter(name=imageset_name).exists():
+                    messages.error(request, f"ImageSet with name '{imageset_name}' already exists")
+                    return render(request, 'admin/load_imageset_form.html')
+                
+                # Create ImageSet
+                image_set = ImageSet.objects.create(
+                    name=imageset_name,
+                    description=description,
+                    created_by=request.user
+                )
+                
+                # Load images
+                allowed_extensions = ('.jpg', '.jpeg', '.png')
+                total_loaded = 0
+                real_count = 0
+                synth_count = 0
+                
+                # Load real images
+                for img_file in real_folder.iterdir():
+                    if img_file.is_file() and img_file.suffix.lower() in allowed_extensions:
+                        with open(img_file, 'rb') as f:
+                            from django.core.files import File
+                            image = Image(
+                                image_set=image_set,
+                                original_filename=img_file.name,
+                                is_real=True
+                            )
+                            image.file.save(img_file.name, File(f), save=True)
+                            total_loaded += 1
+                            real_count += 1
+                
+                # Load synthetic images
+                for img_file in synth_folder.iterdir():
+                    if img_file.is_file() and img_file.suffix.lower() in allowed_extensions:
+                        with open(img_file, 'rb') as f:
+                            from django.core.files import File
+                            image = Image(
+                                image_set=image_set,
+                                original_filename=img_file.name,
+                                is_real=False
+                            )
+                            image.file.save(img_file.name, File(f), save=True)
+                            total_loaded += 1
+                            synth_count += 1
+                
+                if total_loaded == 0:
+                    image_set.delete()
+                    messages.error(request, 'No valid images found in the specified folders')
+                    return render(request, 'admin/load_imageset_form.html')
+                
+                messages.success(request, f"Successfully created ImageSet '{imageset_name}' with {total_loaded} images ({real_count} real, {synth_count} synthetic)")
+                return redirect('admin:evaluator_imageset_changelist')
+                
+            except Exception as e:
+                messages.error(request, f"Error loading ImageSet: {str(e)}")
+                return render(request, 'admin/load_imageset_form.html')
+        
+        return render(request, 'admin/load_imageset_form.html')
 
 
 @admin.register(Image)
