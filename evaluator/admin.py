@@ -132,87 +132,117 @@ class ImageSetAdmin(admin.ModelAdmin):
         from django.contrib import messages
         from pathlib import Path
         import os
+        import zipfile
+        import tempfile
+        import shutil
+        from django.core.files import File
         
         if request.method == 'POST':
-            folder_path = request.POST.get('folder_path')
+            zip_file = request.FILES.get('zip_file')
             imageset_name = request.POST.get('imageset_name')
             description = request.POST.get('description', '')
             
+            if not zip_file:
+                messages.error(request, "Please upload a ZIP file")
+                return render(request, 'admin/load_imageset_form.html')
+
+            # Check if ImageSet already exists
+            if ImageSet.objects.filter(name=imageset_name).exists():
+                messages.error(request, f"ImageSet with name '{imageset_name}' already exists")
+                return render(request, 'admin/load_imageset_form.html')
+            
             try:
-                folder_path = Path(folder_path)
-                
-                # Validate folder structure
-                if not folder_path.exists():
-                    messages.error(request, f"Folder '{folder_path}' does not exist")
-                    return render(request, 'admin/load_imageset_form.html')
-                
-                real_folder = folder_path / 'real'
-                synth_folder = folder_path / 'synth'
-                
-                if not real_folder.exists():
-                    messages.error(request, f"'real' subfolder not found in '{folder_path}'")
-                    return render(request, 'admin/load_imageset_form.html')
-                
-                if not synth_folder.exists():
-                    messages.error(request, f"'synth' subfolder not found in '{folder_path}'")
-                    return render(request, 'admin/load_imageset_form.html')
-                
-                # Check if ImageSet already exists
-                if ImageSet.objects.filter(name=imageset_name).exists():
-                    messages.error(request, f"ImageSet with name '{imageset_name}' already exists")
-                    return render(request, 'admin/load_imageset_form.html')
-                
-                # Create ImageSet
-                image_set = ImageSet.objects.create(
-                    name=imageset_name,
-                    description=description,
-                    created_by=request.user
-                )
-                
-                # Load images
-                allowed_extensions = ('.jpg', '.jpeg', '.png')
-                total_loaded = 0
-                real_count = 0
-                synth_count = 0
-                
-                # Load real images
-                for img_file in real_folder.iterdir():
-                    if img_file.is_file() and img_file.suffix.lower() in allowed_extensions:
-                        with open(img_file, 'rb') as f:
-                            from django.core.files import File
-                            image = Image(
-                                image_set=image_set,
-                                original_filename=img_file.name,
-                                is_real=True
-                            )
-                            image.file.save(img_file.name, File(f), save=True)
-                            total_loaded += 1
-                            real_count += 1
-                
-                # Load synthetic images
-                for img_file in synth_folder.iterdir():
-                    if img_file.is_file() and img_file.suffix.lower() in allowed_extensions:
-                        with open(img_file, 'rb') as f:
-                            from django.core.files import File
-                            image = Image(
-                                image_set=image_set,
-                                original_filename=img_file.name,
-                                is_real=False
-                            )
-                            image.file.save(img_file.name, File(f), save=True)
-                            total_loaded += 1
-                            synth_count += 1
-                
-                if total_loaded == 0:
-                    image_set.delete()
-                    messages.error(request, 'No valid images found in the specified folders')
-                    return render(request, 'admin/load_imageset_form.html')
-                
-                messages.success(request, f"Successfully created ImageSet '{imageset_name}' with {total_loaded} images ({real_count} real, {synth_count} synthetic)")
+                # Create temp directory
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    temp_path = Path(temp_dir)
+                    
+                    # Save uploaded zip
+                    zip_path = temp_path / 'upload.zip'
+                    with open(zip_path, 'wb+') as destination:
+                        for chunk in zip_file.chunks():
+                            destination.write(chunk)
+                    
+                    # Extract zip
+                    try:
+                        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                            zip_ref.extractall(temp_path)
+                    except zipfile.BadZipFile:
+                         messages.error(request, "Invalid ZIP file")
+                         return render(request, 'admin/load_imageset_form.html')
+                    
+                    # Locate real and synth folders
+                    # Possible structures:
+                    # 1. Root -> real/, synth/
+                    # 2. Root -> Folder/ -> real/, synth/
+                    
+                    real_folder = None
+                    synth_folder = None
+                    
+                    # Check root
+                    if (temp_path / 'real').exists() and (temp_path / 'synth').exists():
+                        real_folder = temp_path / 'real'
+                        synth_folder = temp_path / 'synth'
+                    else:
+                        # Check subdirectories
+                        for child in temp_path.iterdir():
+                            if child.is_dir():
+                                if (child / 'real').exists() and (child / 'synth').exists():
+                                    real_folder = child / 'real'
+                                    synth_folder = child / 'synth'
+                                    break
+                    
+                    if not real_folder or not synth_folder:
+                        messages.error(request, "Could not find 'real' and 'synth' folders in the ZIP file. Please ensure the structure is correct.")
+                        return render(request, 'admin/load_imageset_form.html')
+                    
+                    # Create ImageSet
+                    image_set = ImageSet.objects.create(
+                        name=imageset_name,
+                        description=description,
+                        created_by=request.user
+                    )
+                    
+                    # Load images
+                    allowed_extensions = {'.jpg', '.jpeg', '.png'}
+                    total_loaded = 0
+                    real_count = 0
+                    synth_count = 0
+                    
+                    def process_folder(folder, is_real):
+                        count = 0
+                        for img_file in folder.iterdir():
+                            if img_file.is_file() and img_file.suffix.lower() in allowed_extensions:
+                                # Avoid dotfiles (like .DS_Store or ._image.jpg)
+                                if img_file.name.startswith('.'):
+                                    continue
+                                    
+                                with open(img_file, 'rb') as f:
+                                    image = Image(
+                                        image_set=image_set,
+                                        original_filename=img_file.name,
+                                        is_real=is_real
+                                    )
+                                    image.file.save(img_file.name, File(f), save=True)
+                                    count += 1
+                        return count
+
+                    real_count = process_folder(real_folder, True)
+                    synth_count = process_folder(synth_folder, False)
+                    total_loaded = real_count + synth_count
+
+                    if total_loaded == 0:
+                         image_set.delete()
+                         messages.error(request, "No valid images found in the 'real' and 'synth' folders.")
+                         return render(request, 'admin/load_imageset_form.html')
+                    
+                messages.success(request, f"Successfully created ImageSet '{imageset_name}' with {total_loaded} images ({real_count} real, {synth_count} synthetic).")
                 return redirect('admin:evaluator_imageset_changelist')
                 
             except Exception as e:
-                messages.error(request, f"Error loading ImageSet: {str(e)}")
+                messages.error(request, f"Error processing file: {str(e)}")
+                # If image_set was created but failed mid-way, maybe delete it? 
+                # For safety let's leave unless we are sure. But good practice is atomic.
+                # Here we are in a try block.
                 return render(request, 'admin/load_imageset_form.html')
         
         return render(request, 'admin/load_imageset_form.html')

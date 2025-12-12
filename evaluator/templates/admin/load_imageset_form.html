@@ -31,35 +31,32 @@
 
             <div class="alert alert-info">
                 <h5><i class="bi bi-info-circle"></i> Instructions</h5>
-                <p class="mb-2">Your folder must have the following structure:</p>
-                <pre class="bg-light p-3 rounded"><code>your_folder/
+                <p class="mb-2">Upload a <strong>ZIP file</strong> containing the following folder structure:</p>
+                <pre class="bg-light p-3 rounded"><code>imageset.zip
 ├── real/
 │   ├── image1.jpg
-│   ├── image2.png
 │   └── ...
 └── synth/
     ├── image1.jpg
-    ├── image2.png
     └── ...</code></pre>
-                <p class="mb-0"><strong>Supported formats:</strong> .jpg, .jpeg, .png</p>
+                <p class="mb-0"><strong>Supported image formats:</strong> .jpg, .jpeg, .png</p>
             </div>
 
-            <form method="post" class="mt-4">
+            <form method="post" enctype="multipart/form-data" class="mt-4">
                 {% csrf_token %}
                 
                 <div class="mb-4">
-                    <label for="folder_path" class="form-label fw-bold">
-                        <i class="bi bi-folder"></i> Folder Path
+                    <label for="zip_file" class="form-label fw-bold">
+                        <i class="bi bi-file-zip"></i> ImageSet ZIP File
                     </label>
-                    <input type="text" 
+                    <input type="file" 
                            class="form-control form-control-lg" 
-                           id="folder_path" 
-                           name="folder_path" 
-                           required
-                           placeholder="/absolute/path/to/folder"
-                           value="{{ request.POST.folder_path }}">
+                           id="zip_file" 
+                           name="zip_file" 
+                           accept=".zip"
+                           required>
                     <small class="form-text text-muted">
-                        Enter the absolute path to the folder containing real/ and synth/ subdirectories
+                        Select a ZIP file containing 'real' and 'synth' folders with images
                     </small>
                 </div>
 
