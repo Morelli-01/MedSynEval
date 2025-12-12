@@ -81,33 +81,49 @@ def evaluate_image(request):
                 'message': 'You have no image sets assigned for evaluation. Please contact your administrator.'
             })
     
-    # Get all images from assigned image sets
-    assigned_image_ids = []
-    for assignment in assignments:
-        assigned_image_ids.extend(
-            assignment.image_set.images.values_list('id', flat=True)
-        )
+    # Determine which assignment to use
+    selected_assignment_id = request.GET.get('assignment')
+    if selected_assignment_id:
+        try:
+            selected_assignment = assignments.get(id=selected_assignment_id)
+        except Assignment.DoesNotExist:
+            messages.error(request, 'Invalid assignment selected.')
+            return redirect('evaluate')
+    else:
+        # Default to the first assignment
+        selected_assignment = assignments.first()
+
+    # Get all images from the selected assignment's image set
+    assigned_image_ids = list(selected_assignment.image_set.images.values_list('id', flat=True))
     
     # Get already evaluated image IDs
     evaluated_image_ids = Evaluation.objects.filter(
         clinician=request.user,
-        image__isnull=False
+        image__isnull=False,
+        image__image_set=selected_assignment.image_set # Filter by current assignment's image set
     ).values_list('image_id', flat=True)
     
     # Filter out evaluated images
     remaining_image_ids = set(assigned_image_ids) - set(evaluated_image_ids)
     
     if not remaining_image_ids:
-        # Mark all assignments as completed
-        for assignment in assignments:
-            if assignment.get_progress() == 100:
-                assignment.is_completed = True
-                assignment.completed_at = timezone.now()
-                assignment.save()
+        # Mark selected assignment as completed if progress is 100%
+        if selected_assignment.get_progress() == 100:
+            selected_assignment.is_completed = True
+            selected_assignment.completed_at = timezone.now()
+            selected_assignment.save()
         
-        return render(request, 'evaluator/done.html', {
-            'message': 'You have completed all your assigned evaluations!'
-        })
+        # If user has other incomplete assignments, suggest switching instead of showing done page immediately?
+        # For now, show done message but maybe with a link to others if we were fancy.
+        # But wait, if they strictly want to evaluate, blocking them might be annoying if they just finished one.
+        # Let's just show done for THIS assignment. They can switch via the UI if we add it to done.html,
+        # or we just redirect to evaluate (which defaults to first incomplete).
+        # Actually, if this one is done, let's just let the view handle it.
+        # If we redirect to 'evaluate' without param, it picks the first one.
+        # If the first one is the one we just finished, we loop.
+        # Assignments query filters `is_completed=False`. So if we mark it complete, it disappears from `assignments`.
+        # So redirecting to 'evaluate' will pick the next incomplete one!
+        return redirect('evaluate')
     
     if request.method == 'POST':
         form = EvaluationForm(request.POST)
@@ -124,36 +140,36 @@ def evaluate_image(request):
                 # Verify this image is in one of the user's assignments
                 if image.id not in assigned_image_ids:
                     messages.error(request, 'Invalid image selection.')
-                    return redirect('evaluate')
+                    return redirect(f'/evaluate/?assignment={selected_assignment.id}')
                 
                 # Check if already evaluated
                 if Evaluation.objects.filter(clinician=request.user, image=image).exists():
                     messages.warning(request, 'You have already evaluated this image.')
-                    return redirect('evaluate')
+                    return redirect(f'/evaluate/?assignment={selected_assignment.id}')
                 
                 evaluation.image = image
                 evaluation.save()
                 
-                # Check if any assignments are now complete
-                for assignment in assignments:
-                    if assignment.get_progress() == 100 and not assignment.is_completed:
-                        assignment.is_completed = True
-                        assignment.completed_at = timezone.now()
-                        assignment.save()
+                # Check if selected assignment is now complete
+                if selected_assignment.get_progress() == 100 and not selected_assignment.is_completed:
+                    selected_assignment.is_completed = True
+                    selected_assignment.completed_at = timezone.now()
+                    selected_assignment.save()
+                    # If complete, redirect to base evaluate to pick next one
+                    return redirect('evaluate')
                 
-                return redirect('evaluate')
+                return redirect(f'/evaluate/?assignment={selected_assignment.id}')
                 
             except Image.DoesNotExist:
                 messages.error(request, 'Invalid image.')
-                return redirect('evaluate')
+                return redirect(f'/evaluate/?assignment={selected_assignment.id}')
     else:
         # Pick a random image from remaining ones
         selected_image = Image.objects.filter(id__in=remaining_image_ids).order_by('?').first()
         
         if not selected_image:
-            return render(request, 'evaluator/done.html', {
-                'message': 'No more images to evaluate.'
-            })
+             # Should be covered by remaining_image_ids check above, but purely defensive:
+             return redirect('evaluate')
         
         form = EvaluationForm()
         
@@ -170,7 +186,9 @@ def evaluate_image(request):
                 'evaluated': total_evaluated,
                 'total': total_assigned,
                 'percentage': progress_percentage
-            }
+            },
+            'assignments': assignments,
+            'selected_assignment': selected_assignment,
         }
         return render(request, 'evaluator/evaluate.html', context)
 

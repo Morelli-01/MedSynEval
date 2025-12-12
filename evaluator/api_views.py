@@ -111,6 +111,11 @@ def get_next_image(request):
             is_completed=False
         ).select_related('image_set')
         
+        # Filter by specific assignment if requested
+        assignment_id = request.GET.get('assignment_id')
+        if assignment_id:
+            assignments = assignments.filter(id=assignment_id)
+        
         if not assignments.exists():
             return JsonResponse({
                 'success': True,
@@ -131,6 +136,18 @@ def get_next_image(request):
             image__isnull=False
         ).values_list('image_id', flat=True)
         
+        # Calculate progress solely based on the current scope (assignments var)
+        # If we filtered by assignment_id, this calculates progress for THAT assignment.
+        # However, we must ensure evaluated_image_ids are also filtered by this assignment's image set
+        # to get correct progress for just this assignment.
+        if assignment_id:
+             # Get images specifically for these assignments
+             scope_image_ids = set(assigned_image_ids)
+             evaluated_image_ids = Evaluation.objects.filter(
+                clinician=request.user,
+                image__id__in=scope_image_ids
+            ).values_list('image_id', flat=True)
+
         # Filter out evaluated images
         remaining_image_ids = set(assigned_image_ids) - set(evaluated_image_ids)
         

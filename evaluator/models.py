@@ -32,11 +32,16 @@ class ImageSet(models.Model):
     def get_synth_count(self):
         return self.images.filter(is_real=False).count()
 
+def get_upload_path(instance, filename):
+    folder = 'real' if instance.is_real else 'synth'
+    # Sanitize imageset name to be safe for filenames if needed
+    return f"image_sets/{instance.image_set.name}/data/{folder}/{filename}"
+
 class Image(models.Model):
     """Individual image within an image set"""
     image_set = models.ForeignKey(ImageSet, on_delete=models.CASCADE, related_name='images')
     file = models.ImageField(
-        upload_to='imagesets/%Y/%m/%d/',
+        upload_to=get_upload_path,
         validators=[FileExtensionValidator(allowed_extensions=['jpg', 'jpeg', 'png'])],
         help_text="Image file"
     )

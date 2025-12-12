@@ -21,6 +21,29 @@
                 </div>
             </div>
 
+            <!-- Assignment Selector -->
+            {% if assignments and assignments.count > 1 %}
+            <div class="card shadow-sm border-0 mb-3">
+                <div class="card-body py-2 d-flex align-items-center justify-content-between">
+                    <div class="d-flex align-items-center">
+                        <i class="bi bi-collection me-2 text-primary"></i>
+                        <span class="fw-bold text-muted me-2">Current Assignment:</span>
+                        <span class="fw-bold">{{ selected_assignment.image_set.name }}</span>
+                    </div>
+                    <form method="get" class="d-flex align-items-center" id="assignmentSelectorForm">
+                        <label for="assignmentSelect" class="me-2 text-muted small">Switch to:</label>
+                        <select name="assignment" id="assignmentSelect" class="form-select form-select-sm w-auto" onchange="this.form.submit()">
+                            {% for assignment in assignments %}
+                            <option value="{{ assignment.id }}" {% if assignment.id == selected_assignment.id %}selected{% endif %}>
+                                {{ assignment.image_set.name }} ({{ assignment.get_progress|stringformat:".0f" }}%)
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </form>
+                </div>
+            </div>
+            {% endif %}
+
             <!-- Main Evaluation Card -->
             <div id="evaluationContainer" class="card shadow-lg border-0 overflow-hidden" style="max-height: 85vh;">
                 <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
@@ -478,7 +501,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     async function loadNextImage() {
         try {
-            const response = await fetch('{% url "get_next_image" %}');
+            const response = await fetch('{% url "get_next_image" %}?assignment_id={{ selected_assignment.id }}');
             const data = await response.json();
             
             if (data.success) {
