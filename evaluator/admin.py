@@ -223,6 +223,16 @@ class ImageSetAdmin(admin.ModelAdmin):
                                         is_real=is_real
                                     )
                                     image.file.save(img_file.name, File(f), save=True)
+                                    
+                                    # Ensure file is world-readable (0o644) so web server can serve it
+                                    try:
+                                        full_path = image.file.path
+                                        os.chmod(full_path, 0o644)
+                                        # Ensure directory is executable/readable (0o755)
+                                        os.chmod(os.path.dirname(full_path), 0o755)
+                                    except Exception:
+                                        pass # Best effort if permissions fail
+                                        
                                     count += 1
                         return count
 
