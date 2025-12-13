@@ -9,11 +9,12 @@ from .models import Clinician, Evaluation, Invitation, ImageSet, Image, Assignme
 import json
 
 class ClinicianAdmin(UserAdmin):
+    list_display = ('username', 'email', 'first_name', 'last_name', 'title', 'workplace', 'is_staff')
     fieldsets = UserAdmin.fieldsets + (
-        (None, {'fields': ('title', 'years_experience')}),
+        ('Professional Info', {'fields': ('title', 'workplace', 'years_experience')}),
     )
     add_fieldsets = UserAdmin.add_fieldsets + (
-        (None, {'fields': ('title', 'years_experience')}),
+        ('Professional Info', {'fields': ('title', 'workplace', 'years_experience')}),
     )
 
 @admin.register(Evaluation)
