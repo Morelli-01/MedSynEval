@@ -5,8 +5,109 @@ from django.utils import timezone
 from django.utils.html import format_html
 from django.urls import reverse
 from django.db.models import Count, Q
+from django.core.mail import send_mail
+from django.conf import settings
 from .models import Clinician, Evaluation, Invitation, ImageSet, Image, Assignment
 import json
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+def send_assignment_notification(assignment, assigned_by):
+    """
+    Send an email notification to the clinician about their new assignment.
+    The email is sent using the superuser's (assigned_by) email address.
+    """
+    clinician = assignment.clinician
+    image_set = assignment.image_set
+    
+    # Check if clinician has a valid email
+    if not clinician.email:
+        logger.warning(f"Cannot send assignment notification: Clinician {clinician.username} has no email address")
+        return False
+    
+    # Check if assigned_by user has an email (to use as sender)
+    sender_email = assigned_by.email if assigned_by and assigned_by.email else settings.DEFAULT_FROM_EMAIL
+    
+    subject = f"New Image Evaluation Assignment: {image_set.name}"
+    
+    # Count assigned images
+    if assignment.pk and assignment.assigned_images.exists():
+        image_count = assignment.assigned_images.count()
+    else:
+        image_count = image_set.images.count()
+    
+    # Application URL
+    app_url = "https://zip-dgx.ing.unimore.it/"
+    
+    message = f"""
+Dear {clinician.first_name or clinician.username},
+
+You have been assigned a new image evaluation task.
+
+Assignment Details:
+- Image Set: {image_set.name}
+- Number of Images: {image_count}
+- Assigned By: {assigned_by.get_full_name() or assigned_by.username if assigned_by else 'System'}
+
+Please log in to MedSynEval to start your evaluation:
+{app_url}
+
+Best regards,
+AImageLab Team
+"""
+    
+    html_message = f"""
+<html>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+        <h2 style="color: #2c5282;">New Image Evaluation Assignment</h2>
+        
+        <p>Dear <strong>{clinician.first_name or clinician.username}</strong>,</p>
+        
+        <p>You have been assigned a new image evaluation task.</p>
+        
+        <div style="background-color: #f7fafc; border-left: 4px solid #4299e1; padding: 15px; margin: 20px 0;">
+            <h3 style="margin-top: 0; color: #2b6cb0;">Assignment Details</h3>
+            <ul style="list-style: none; padding: 0; margin: 0;">
+                <li><strong>Image Set:</strong> {image_set.name}</li>
+                <li><strong>Number of Images:</strong> {image_count}</li>
+                <li><strong>Assigned By:</strong> {assigned_by.get_full_name() or assigned_by.username if assigned_by else 'System'}</li>
+            </ul>
+        </div>
+        
+        <p>Please log in to <strong>MedSynEval</strong> to start your evaluation:</p>
+        
+        <p style="text-align: center; margin: 25px 0;">
+            <a href="{app_url}" style="display: inline-block; background-color: #4299e1; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">Start Evaluation</a>
+        </p>
+        
+        <p style="color: #718096; font-size: 12px;">Or copy and paste this link in your browser:<br><a href="{app_url}" style="color: #4299e1;">{app_url}</a></p>
+        
+        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 30px 0;">
+        
+        <p style="color: #718096; font-size: 12px;">Best regards,<br>AImageLab Team</p>
+    </div>
+</body>
+</html>
+"""
+    
+    try:
+        send_mail(
+            subject=subject,
+            message=message,
+            from_email=sender_email,
+            recipient_list=[clinician.email],
+            html_message=html_message,
+            fail_silently=False,
+        )
+        logger.info(f"Assignment notification sent to {clinician.email} from {sender_email}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to send assignment notification to {clinician.email}: {str(e)}")
+        return False
+
 
 class ClinicianAdmin(UserAdmin):
     list_display = ('username', 'email', 'first_name', 'last_name', 'title', 'workplace','years_experience', 'is_staff')
@@ -295,6 +396,9 @@ class ImageSetAdmin(admin.ModelAdmin):
                  return None
 
             success_count = 0
+            email_sent_count = 0
+            email_failed_count = 0
+            
             for imageset in queryset:
                 images = list(imageset.images.all())
                 if not images:
@@ -322,9 +426,23 @@ class ImageSetAdmin(admin.ModelAdmin):
                         # For safety, let's untick completed if we are giving new images.
                         assignment.is_completed = False
                         assignment.save()
+                        
+                        # Send email notification
+                        if send_assignment_notification(assignment, request.user):
+                            email_sent_count += 1
+                        else:
+                            email_failed_count += 1
+                            
                 success_count += 1
             
-            self.message_user(request, f"Successfully split and assigned {success_count} ImageSets to {num_clinicians} clinicians.")
+            # Build feedback message
+            message = f"Successfully split and assigned {success_count} ImageSets to {num_clinicians} clinicians."
+            if email_sent_count > 0:
+                message += f" {email_sent_count} email notification(s) sent."
+            if email_failed_count > 0:
+                message += f" {email_failed_count} email(s) failed to send."
+            
+            self.message_user(request, message)
             return None
 
         # Render selection form
@@ -415,7 +533,9 @@ class AssignmentAdmin(admin.ModelAdmin):
     save_on_top = True
 
     def save_model(self, request, obj, form, change):
-        if not change:  # Only set assigned_by on creation
+        is_new_assignment = not change
+        
+        if is_new_assignment:  # Only set assigned_by on creation
             obj.assigned_by = request.user
         
         # Check if assignment is completed
@@ -424,4 +544,8 @@ class AssignmentAdmin(admin.ModelAdmin):
             obj.completed_at = timezone.now()
         
         super().save_model(request, obj, form, change)
+        
+        # Send email notification for new assignments
+        if is_new_assignment:
+            send_assignment_notification(obj, request.user)
 
